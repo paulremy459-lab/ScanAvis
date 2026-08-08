@@ -38,6 +38,14 @@
   --stroke:rgba(255,255,255,.10);
   --stroke-2:rgba(255,255,255,.18);
 
+  /* matière « liquid glass », pilotée depuis Réglages */
+  --g-hi:rgba(255,255,255,.11);
+  --g-mid:rgba(255,255,255,.045);
+  --g-lo:rgba(255,255,255,.018);
+  --g-edge:rgba(255,255,255,.15);
+  --g-spec:rgba(255,255,255,.30);
+  --sat:200%;
+
   --r-xs:10px; --r-sm:14px; --r-md:20px; --r-lg:26px; --r-xl:34px; --r-full:999px;
 
   --shadow-sm:0 2px 10px rgba(0,0,0,.28);
@@ -45,7 +53,7 @@
   --shadow-lg:0 28px 70px rgba(0,0,0,.52);
   --glow:0 0 0 1px rgba(46,139,255,.35), 0 10px 40px rgba(46,139,255,.28);
 
-  --blur:26px;
+  --blur:42px;
   --spring:cubic-bezier(.22,1,.36,1);
   --snap:cubic-bezier(.32,.72,0,1);
 
@@ -74,7 +82,7 @@ button{background:none;border:none;cursor:pointer}
 /* ambient background */
 .ambient{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:
   radial-gradient(120% 90% at 50% -10%, var(--bg-1) 0%, var(--bg-2) 45%, var(--bg-3) 100%)}
-.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 26s var(--spring) infinite alternate}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.72;animation:drift 26s var(--spring) infinite alternate}
 .orb.a{width:52vmax;height:52vmax;left:-14vmax;top:-16vmax;background:radial-gradient(circle,var(--orb-1),transparent 68%)}
 .orb.b{width:44vmax;height:44vmax;right:-14vmax;top:14vmax;background:radial-gradient(circle,var(--orb-2),transparent 68%);animation-delay:-9s}
 .orb.c{width:40vmax;height:40vmax;left:26vmax;bottom:-20vmax;background:radial-gradient(circle,var(--orb-3),transparent 68%);animation-delay:-16s}
@@ -86,22 +94,33 @@ button{background:none;border:none;cursor:pointer}
    ============================================================ */
 .glass{
   position:relative;
-  background:linear-gradient(160deg,var(--glass-2),var(--glass) 46%,rgba(255,255,255,.03));
-  backdrop-filter:blur(var(--blur)) saturate(190%);
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(190%);
-  border:1px solid var(--stroke);
+  background:linear-gradient(158deg,var(--g-hi) 0%,var(--g-lo) 42%,var(--g-mid) 100%);
+  backdrop-filter:blur(var(--blur)) saturate(var(--sat)) brightness(1.06);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat)) brightness(1.06);
+  border:1px solid var(--g-edge);
   border-radius:var(--r-lg);
-  box-shadow:var(--shadow-md), inset 0 1px 0 rgba(255,255,255,.14), inset 0 -1px 0 rgba(0,0,0,.16);
+  box-shadow:
+    0 18px 52px rgba(0,0,0,.34),
+    0 2px 8px rgba(0,0,0,.18),
+    inset 0 1px 0 var(--g-spec),
+    inset 1px 0 0 rgba(255,255,255,.07),
+    inset -1px 0 0 rgba(255,255,255,.07),
+    inset 0 -1px 0 rgba(0,0,0,.14);
   overflow:hidden;
 }
-/* the specular sheen — signature detail */
+/* reflet spéculaire mobile — la signature de la matière */
 .glass::before{
   content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
-  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.10) 44%,rgba(255,255,255,.02) 56%,transparent 70%);
-  background-size:280% 280%;background-position:0% 0%;
-  transition:background-position 1.1s var(--spring);
+  background:linear-gradient(115deg,transparent 26%,rgba(255,255,255,.16) 42%,rgba(255,255,255,.04) 54%,transparent 68%);
+  background-size:300% 300%;background-position:0% 0%;
+  transition:background-position 1.3s var(--spring),opacity .5s;
 }
 .glass:hover::before{background-position:100% 100%}
+/* halo de bord haut, comme la réfraction sur une tranche de verre */
+.glass::after{
+  content:'';position:absolute;left:8%;right:8%;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--g-spec),transparent);
+}
 
 /* ============================================================
    SHELL
@@ -112,9 +131,9 @@ button{background:none;border:none;cursor:pointer}
 .topbar{
   flex:none;display:flex;align-items:center;gap:14px;
   padding:14px 22px;
-  background:linear-gradient(180deg,rgba(7,18,36,.86),rgba(7,18,36,.42));
-  backdrop-filter:blur(22px) saturate(180%);
-  -webkit-backdrop-filter:blur(22px) saturate(180%);
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  backdrop-filter:blur(var(--blur)) saturate(var(--sat)) brightness(1.04);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat)) brightness(1.04);
   border-bottom:1px solid var(--stroke);
   z-index:40;
 }
@@ -181,9 +200,10 @@ button{background:none;border:none;cursor:pointer}
 /* sidebar */
 .rail{
   flex:none;width:224px;padding:16px 12px;display:flex;flex-direction:column;gap:3px;
-  border-right:1px solid var(--stroke);
-  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
-  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-right:1px solid var(--g-edge);
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.008));
+  backdrop-filter:blur(var(--blur)) saturate(var(--sat));
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat));
   overflow-y:auto;
 }
 .rail-lbl{font-size:10.5px;font-weight:640;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-4);padding:16px 12px 7px}
@@ -403,9 +423,11 @@ select.inp option{background:#0B1B33;color:var(--ink)}
 .sheet{
   width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;
   border-radius:var(--r-xl);
-  background:linear-gradient(165deg,rgba(24,44,78,.94),rgba(9,20,38,.96));
-  backdrop-filter:blur(40px) saturate(200%);-webkit-backdrop-filter:blur(40px) saturate(200%);
-  border:1px solid var(--stroke-2);box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.16);
+  background:linear-gradient(160deg,rgba(255,255,255,.13),rgba(255,255,255,.04) 46%,rgba(255,255,255,.07));
+  backdrop-filter:blur(60px) saturate(210%) brightness(1.04);
+  -webkit-backdrop-filter:blur(60px) saturate(210%) brightness(1.04);
+  border:1px solid rgba(255,255,255,.19);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.32),inset 0 -1px 0 rgba(0,0,0,.2);
   animation:sheetIn .46s var(--spring);overflow:hidden;
 }
 .sheet.wide{max-width:840px}
@@ -514,9 +536,11 @@ select.inp option{background:#0B1B33;color:var(--ink)}
    ============================================================ */
 .auth{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:22px;overflow-y:auto}
 .auth-card{width:100%;max-width:404px;padding:34px 30px;border-radius:var(--r-xl);
-  background:linear-gradient(165deg,rgba(26,48,86,.82),rgba(9,20,38,.9));
-  backdrop-filter:blur(44px) saturate(200%);-webkit-backdrop-filter:blur(44px) saturate(200%);
-  border:1px solid var(--stroke-2);box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.18);
+  background:linear-gradient(158deg,rgba(255,255,255,.14),rgba(255,255,255,.04) 46%,rgba(255,255,255,.08));
+  backdrop-filter:blur(60px) saturate(210%) brightness(1.05);
+  -webkit-backdrop-filter:blur(60px) saturate(210%) brightness(1.05);
+  border:1px solid rgba(255,255,255,.2);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.34);
   animation:sheetIn .6s var(--spring)}
 .auth-mark{width:56px;height:56px;border-radius:18px;margin:0 auto 20px;display:grid;place-items:center;
   background:linear-gradient(150deg,var(--accent),var(--accent-deep));
@@ -577,9 +601,10 @@ select.inp option{background:#0B1B33;color:var(--ink)}
   .tabbar{display:flex;
     display:flex;position:fixed;bottom:0;left:0;right:0;z-index:60;
     padding:8px 8px calc(8px + var(--safe-b));gap:2px;
-    background:rgba(7,18,36,.84);backdrop-filter:blur(30px) saturate(190%);
-    -webkit-backdrop-filter:blur(30px) saturate(190%);
-    border-top:1px solid var(--stroke);
+    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.08));
+    backdrop-filter:blur(var(--blur)) saturate(var(--sat));
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--sat));
+    border-top:1px solid var(--g-edge);
   }
   .tabb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3.5px;padding:7px 3px;
     border-radius:var(--r-sm);font-size:9.5px;font-weight:580;color:var(--ink-3);transition:.24s var(--spring)}
@@ -1010,7 +1035,8 @@ const API = {
         assujettiTVA: pa.assujetti_tva ?? false,
         tvaTaux: toNum(pa.tva_taux ?? 20),
         accent: pa.theme_accent || '#2E8BFF',
-        fond: pa.theme_fond || 'marine'
+        fond: pa.theme_fond || 'marine',
+        verre: pa.theme_verre || 'verre'
       }
     };
   },
@@ -1087,7 +1113,7 @@ const API = {
     const { error } = await sb.from('parametres').upsert({
       user_id: S.user.id, alertes_stock: st.alertesStock,
       assujetti_tva: st.assujettiTVA, tva_taux: st.tvaTaux,
-      theme_accent: st.accent, theme_fond: st.fond
+      theme_accent: st.accent, theme_fond: st.fond, theme_verre: st.verre
     });
     return !boum(error);
   },
@@ -1143,27 +1169,59 @@ const API = {
 
 /* ---------- Apparence ---------- */
 const ACCENTS = [
-  { n: 'Bleu',    c: '#2E8BFF', soft: '#5AC8FA', deep: '#0A5FD1' },
-  { n: 'Violet',  c: '#A78BFA', soft: '#C4B0FF', deep: '#6E45E2' },
-  { n: 'Vert',    c: '#32D74B', soft: '#6EE787', deep: '#1E9E36' },
+  { n: 'Bleu',      c: '#2E8BFF', soft: '#5AC8FA', deep: '#0A5FD1' },
+  { n: 'Azur',      c: '#38BDF8', soft: '#7DD3FC', deep: '#0284C7' },
+  { n: 'Cyan',      c: '#22D3EE', soft: '#7EE7F5', deep: '#0891B2' },
   { n: 'Turquoise', c: '#2DD4BF', soft: '#7DF0E2', deep: '#0F9488' },
-  { n: 'Orange',  c: '#FF8A5B', soft: '#FFB48F', deep: '#E05A28' },
-  { n: 'Rose',    c: '#FF6B9D', soft: '#FFA0C0', deep: '#D63C74' },
-  { n: 'Or',      c: '#FFB020', soft: '#FFD06B', deep: '#D98A00' },
-  { n: 'Rouge',   c: '#FF453A', soft: '#FF8078', deep: '#C9271D' }
+  { n: 'Émeraude',  c: '#34D399', soft: '#7FE9C0', deep: '#059669' },
+  { n: 'Vert',      c: '#32D74B', soft: '#6EE787', deep: '#1E9E36' },
+  { n: 'Citron',    c: '#A3E635', soft: '#CBEF7E', deep: '#65A30D' },
+  { n: 'Or',        c: '#FFB020', soft: '#FFD06B', deep: '#D98A00' },
+  { n: 'Ambre',     c: '#FB923C', soft: '#FDBA74', deep: '#EA580C' },
+  { n: 'Corail',    c: '#FF8A5B', soft: '#FFB48F', deep: '#E05A28' },
+  { n: 'Rouge',     c: '#FF453A', soft: '#FF8078', deep: '#C9271D' },
+  { n: 'Framboise', c: '#F43F5E', soft: '#FB8DA0', deep: '#BE123C' },
+  { n: 'Rose',      c: '#FF6B9D', soft: '#FFA0C0', deep: '#D63C74' },
+  { n: 'Fuchsia',   c: '#E879F9', soft: '#F2B4FC', deep: '#A21CAF' },
+  { n: 'Violet',    c: '#A78BFA', soft: '#C4B0FF', deep: '#6E45E2' },
+  { n: 'Indigo',    c: '#818CF8', soft: '#A9B1FB', deep: '#4338CA' }
 ];
+
 const FONDS = {
-  marine:  { n: 'Marine',    v: ['#12305C', '#071224', '#040A15'] },
-  nuit:    { n: 'Nuit',      v: ['#1A1A24', '#0C0C12', '#050508'] },
-  ardoise: { n: 'Ardoise',   v: ['#2A3442', '#141A22', '#080B0F'] },
-  ocean:   { n: 'Océan',     v: ['#0D4A52', '#06212A', '#020D12'] },
-  prune:   { n: 'Prune',     v: ['#3A1D4E', '#1B0E28', '#0A0512'] },
-  foret:   { n: 'Forêt',     v: ['#153D2E', '#081E16', '#030D09'] }
+  marine:   { n: 'Marine',   v: ['#12305C', '#071224', '#040A15'] },
+  nuit:     { n: 'Nuit',     v: ['#1A1A24', '#0C0C12', '#050508'] },
+  ardoise:  { n: 'Ardoise',  v: ['#2A3442', '#141A22', '#080B0F'] },
+  ocean:    { n: 'Océan',    v: ['#0D4A52', '#06212A', '#020D12'] },
+  abysse:   { n: 'Abysse',   v: ['#0A2A4A', '#03131F', '#01070C'] },
+  foret:    { n: 'Forêt',    v: ['#153D2E', '#081E16', '#030D09'] },
+  mousse:   { n: 'Mousse',   v: ['#26402A', '#111F14', '#050B06'] },
+  prune:    { n: 'Prune',    v: ['#3A1D4E', '#1B0E28', '#0A0512'] },
+  bordeaux: { n: 'Bordeaux', v: ['#4A1526', '#240A13', '#0D0407'] },
+  cuivre:   { n: 'Cuivre',   v: ['#4A2A15', '#24140A', '#0D0704'] },
+  basalte:  { n: 'Basalte',  v: ['#24262B', '#111214', '#060607'] },
+  encre:    { n: 'Encre',    v: ['#1E2A4A', '#0D1424', '#04070E'] }
+};
+
+const VERRES = {
+  sobre:   { n: 'Sobre',   d: 'Surfaces plus denses, lecture maximale',
+             hi: '.16', mid: '.085', lo: '.05', edge: '.16', spec: '.26', blur: '30px', sat: '180%' },
+  verre:   { n: 'Verre',   d: 'L\'équilibre iOS par défaut',
+             hi: '.11', mid: '.045', lo: '.018', edge: '.15', spec: '.30', blur: '42px', sat: '200%' },
+  cristal: { n: 'Cristal', d: 'Très translucide, le fond transparaît',
+             hi: '.075', mid: '.025', lo: '.008', edge: '.13', spec: '.34', blur: '58px', sat: '220%' }
 };
 
 function appliquerTheme(st) {
   const r = document.documentElement.style;
   const a = ACCENTS.find(x => x.c === (st?.accent || '#2E8BFF')) || ACCENTS[0];
+  const g = VERRES[st?.verre] || VERRES.verre;
+  r.setProperty('--g-hi', `rgba(255,255,255,${g.hi})`);
+  r.setProperty('--g-mid', `rgba(255,255,255,${g.mid})`);
+  r.setProperty('--g-lo', `rgba(255,255,255,${g.lo})`);
+  r.setProperty('--g-edge', `rgba(255,255,255,${g.edge})`);
+  r.setProperty('--g-spec', `rgba(255,255,255,${g.spec})`);
+  r.setProperty('--blur', g.blur);
+  r.setProperty('--sat', g.sat);
   r.setProperty('--accent', a.c);
   r.setProperty('--accent-soft', a.soft);
   r.setProperty('--accent-deep', a.deep);
@@ -2277,6 +2335,17 @@ function viewParams() {
               title="${a.n}" style="background:linear-gradient(145deg,${a.soft},${a.deep})"></button>`).join('')}
           </div>
         </div>
+        <div class="field" style="margin-bottom:18px">
+          <label>Matière</label>
+          <div class="fond-list">
+            ${Object.entries(VERRES).map(([k, g]) => `
+              <div class="fond-op ${(st.verre || 'verre') === k ? 'on' : ''}" data-act="setVerre:${k}" title="${esc(g.d)}">
+                <div class="apercu" style="background:linear-gradient(158deg,rgba(255,255,255,${g.hi}),rgba(255,255,255,${g.lo}));
+                  border:1px solid rgba(255,255,255,${g.edge});box-shadow:inset 0 1px 0 rgba(255,255,255,${g.spec})"></div>
+                <b>${g.n}</b></div>`).join('')}
+          </div>
+          <span class="hint">${esc((VERRES[st.verre] || VERRES.verre).d)}</span>
+        </div>
         <div class="field">
           <label>Fond de l'application</label>
           <div class="fond-list">
@@ -3217,6 +3286,12 @@ const ACTIONS = {
   },
   setFond: async cle => {
     S.db.settings.fond = cle;
+    appliquerTheme(S.db.settings);
+    render();
+    await API.saveParametres(S.db.settings);
+  },
+  setVerre: async cle => {
+    S.db.settings.verre = cle;
     appliquerTheme(S.db.settings);
     render();
     await API.saveParametres(S.db.settings);
