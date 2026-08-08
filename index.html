@@ -18,6 +18,10 @@
   --accent:#2E8BFF;
   --accent-soft:#5AC8FA;
   --accent-deep:#0A5FD1;
+
+  /* fond, redéfini par le thème choisi dans Réglages */
+  --bg-1:#12305C; --bg-2:#071224; --bg-3:#040A15;
+  --orb-1:#2E8BFF55; --orb-2:#A78BFA3d; --orb-3:#5AC8FA33;
   --success:#32D74B;
   --warning:#FFD426;
   --danger:#FF453A;
@@ -69,11 +73,11 @@ button{background:none;border:none;cursor:pointer}
 
 /* ambient background */
 .ambient{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:
-  radial-gradient(120% 90% at 50% -10%, #12305C 0%, #071224 45%, #040A15 100%)}
+  radial-gradient(120% 90% at 50% -10%, var(--bg-1) 0%, var(--bg-2) 45%, var(--bg-3) 100%)}
 .orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 26s var(--spring) infinite alternate}
-.orb.a{width:52vmax;height:52vmax;left:-14vmax;top:-16vmax;background:radial-gradient(circle,#2E8BFF55,transparent 68%)}
-.orb.b{width:44vmax;height:44vmax;right:-14vmax;top:14vmax;background:radial-gradient(circle,#A78BFA3d,transparent 68%);animation-delay:-9s}
-.orb.c{width:40vmax;height:40vmax;left:26vmax;bottom:-20vmax;background:radial-gradient(circle,#5AC8FA33,transparent 68%);animation-delay:-16s}
+.orb.a{width:52vmax;height:52vmax;left:-14vmax;top:-16vmax;background:radial-gradient(circle,var(--orb-1),transparent 68%)}
+.orb.b{width:44vmax;height:44vmax;right:-14vmax;top:14vmax;background:radial-gradient(circle,var(--orb-2),transparent 68%);animation-delay:-9s}
+.orb.c{width:40vmax;height:40vmax;left:26vmax;bottom:-20vmax;background:radial-gradient(circle,var(--orb-3),transparent 68%);animation-delay:-16s}
 @keyframes drift{to{transform:translate3d(5vmax,-4vmax,0) scale(1.14)}}
 .grain{position:absolute;inset:0;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 
@@ -126,6 +130,31 @@ button{background:none;border:none;cursor:pointer}
 .brand-txt span{font-size:10.5px;color:var(--ink-3);font-weight:520;letter-spacing:.04em;text-transform:uppercase}
 
 .spacer{flex:1}
+
+/* sélecteur d'activité */
+.ent-pick{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;margin-left:6px;
+  border-radius:var(--r-full);background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+  font-size:13px;font-weight:560;color:var(--ink-2);transition:.22s var(--spring);max-width:210px}
+.ent-pick:hover{background:rgba(255,255,255,.11);color:var(--ink)}
+.ent-pick .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--accent)}
+.ent-pick span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:700px){.ent-pick{max-width:120px}}
+
+/* choix de couleurs */
+.swatches{display:flex;gap:9px;flex-wrap:wrap}
+.sw-col{width:34px;height:34px;border-radius:11px;border:2px solid transparent;cursor:pointer;
+  transition:.22s var(--spring);position:relative}
+.sw-col:hover{transform:scale(1.09)}
+.sw-col.on{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.18)}
+.sw-col.on::after{content:'';position:absolute;inset:0;border-radius:9px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/16px no-repeat}
+.fond-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.fond-op{padding:11px;border-radius:var(--r-sm);border:1px solid var(--stroke);cursor:pointer;
+  transition:.22s var(--spring);text-align:center}
+.fond-op:hover{transform:translateY(-2px)}
+.fond-op.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,139,255,.18)}
+.fond-op .apercu{height:38px;border-radius:9px;margin-bottom:8px}
+.fond-op b{font-size:11.5px;font-weight:580}
 
 .search-wrap{position:relative;max-width:330px;flex:1}
 .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-3);pointer-events:none}
@@ -191,6 +220,9 @@ button{background:none;border:none;cursor:pointer}
 .head h1{font-size:29px;font-weight:680;letter-spacing:-.032em;line-height:1.1}
 .head p{font-size:13.5px;color:var(--ink-3);margin-top:5px;font-weight:480}
 .head .spacer{flex:1}
+
+/* barre d'onglets : masquée hors mobile */
+.tabbar{display:none}
 
 /* ============================================================
    BUTTONS
@@ -285,9 +317,19 @@ tbody td{padding:11.5px 13px;border-top:1px solid rgba(255,255,255,.055);vertica
 tbody tr:first-child td{border-top-color:rgba(255,255,255,.09)}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
 td.str{font-weight:570}
-.row-act{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:.22s}
+.row-act{display:flex;gap:5px;justify-content:flex-end;opacity:.62;transition:.22s}
 tbody tr:hover .row-act{opacity:1}
-@media(hover:none){.row-act{opacity:1}}
+/* sélecteur de statut directement dans le tableau */
+.statut-sel{appearance:none;cursor:pointer;padding:4px 24px 4px 11px;border-radius:var(--r-full);
+  font-size:11.5px;font-weight:600;border:1px solid transparent;transition:.2s var(--spring);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff90' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 7px center;background-size:11px}
+.statut-sel:hover{filter:brightness(1.25)}
+.statut-sel option{background:#0B1B33;color:#F2F6FF}
+.statut-sel.g{background-color:rgba(50,215,75,.16);color:#6EE787;border-color:rgba(50,215,75,.3)}
+.statut-sel.o{background-color:rgba(255,212,38,.16);color:#FFDF6B;border-color:rgba(255,212,38,.3)}
+.statut-sel.b{background-color:rgba(46,139,255,.18);color:#7FB8FF;border-color:rgba(46,139,255,.32)}
+.statut-sel.n{background-color:rgba(255,255,255,.08);color:var(--ink-3);border-color:var(--stroke)}
 
 /* pills / badges */
 .pill{display:inline-flex;align-items:center;gap:5px;padding:3.5px 10px;border-radius:var(--r-full);
@@ -532,7 +574,7 @@ select.inp option{background:#0B1B33;color:var(--ink)}
   .scrim{padding:0;align-items:flex-end}
   .sheet-b{padding:18px}
   .toasts{bottom:calc(86px + var(--safe-b))}
-  .tabbar{
+  .tabbar{display:flex;
     display:flex;position:fixed;bottom:0;left:0;right:0;z-index:60;
     padding:8px 8px calc(8px + var(--safe-b));gap:2px;
     background:rgba(7,18,36,.84);backdrop-filter:blur(30px) saturate(190%);
@@ -630,7 +672,7 @@ select.inp option{background:#0B1B33;color:var(--ink)}
     </div>
     <p class="auth-swap" id="authSwap"></p>
     <div class="auth-note">
-      <b>Démo</b> — les comptes sont stockés localement. À la mise en ligne, Supabase Auth prend le relais et gère le chiffrement des mots de passe.
+      <b>Vos données vous appartiennent</b> — chaque compte est isolé au niveau de la base. Personne d'autre ne peut consulter vos ventes, vos clients ni vos marges.
     </div>
   </div>
 </div>
@@ -642,6 +684,12 @@ select.inp option{background:#0B1B33;color:var(--ink)}
       <div class="brand-mark"><svg viewBox="0 0 24 24"><use href="#i-nfc"/></svg></div>
       <div class="brand-txt"><b>ScanAvis</b><span id="brandSub">Gestion d'activité</span></div>
     </div>
+    <button class="ent-pick" id="entPick" title="Changer d'activité">
+      <span class="dot" id="entDot"></span>
+      <span id="entNom">—</span>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
     <div class="spacer"></div>
     <div class="search-wrap">
       <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
@@ -794,7 +842,8 @@ const S = {
   search: '',
   sort: {},
   filters: {},
-  allUsers: []
+  allUsers: [],
+  ent: null            // activité (entreprise) actuellement ouverte
 };
 
 /* ============================================================================
@@ -887,7 +936,10 @@ const Convertir = {
   client:   r => ({ id: r.id, nom: r.nom, contact: r.contact || '', ville: r.ville || '', tel: r.tel || '', email: r.email || '', secteur: r.secteur || '', statut: r.statut, notes: r.notes || '', createdAt: r.created_at }),
   vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
   commande: r => ({ id: r.id, fournisseur: r.fournisseur, date: r.date, statut: r.statut, frais: toNum(r.frais), notes: r.notes || '', dateReception: r.date_reception, createdAt: r.created_at, lignes: [] }),
-  charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date })
+  charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date }),
+  entreprise: r => ({ id: r.id, nom: r.nom, secteur: r.secteur || '', objectif: toNum(r.objectif),
+    couleur: r.couleur || '#2E8BFF', enseigne: r.enseigne || '', adresse: r.adresse || '',
+    siret: r.siret || '', telephone: r.telephone || '', emailPro: r.email_pro || '' })
 };
 
 function boum(error) {
@@ -901,17 +953,37 @@ function boum(error) {
 
 const API = {
   uid: () => S.user.id,
+  ent: () => S.ent,
+
+  async listerActivites() {
+    const { data, error } = await sb.from('entreprises').select('*')
+      .eq('user_id', S.user.id).eq('archivee', false).order('created_at');
+    if (error) throw error;
+    return (data || []).map(Convertir.entreprise);
+  },
 
   async chargerTout() {
     const u = S.user.id;
+
+    let ents = await this.listerActivites();
+    if (!ents.length) {
+      const { error } = await sb.rpc('creer_activite',
+        { p_nom: 'Mon activité', p_secteur: '', p_avec_catalogue: true });
+      if (error) throw error;
+      ents = await this.listerActivites();
+    }
+    if (!S.ent || !ents.some(e => e.id === S.ent)) S.ent = ents[0].id;
+    const courante = ents.find(e => e.id === S.ent);
+
+    const e = S.ent;
     const [prod, cli, ven, vli, cmd, cli2, chg, par] = await Promise.all([
-      sb.from('produits').select('*').eq('user_id', u).order('created_at'),
-      sb.from('clients').select('*').eq('user_id', u).order('created_at'),
-      sb.from('ventes').select('*').eq('user_id', u).order('date', { ascending: false }),
-      sb.from('vente_lignes').select('*').eq('user_id', u),
-      sb.from('commandes').select('*').eq('user_id', u).order('date', { ascending: false }),
-      sb.from('commande_lignes').select('*').eq('user_id', u),
-      sb.from('charges').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('produits').select('*').eq('entreprise_id', e).order('created_at'),
+      sb.from('clients').select('*').eq('entreprise_id', e).order('created_at'),
+      sb.from('ventes').select('*').eq('entreprise_id', e).order('date', { ascending: false }),
+      sb.from('vente_lignes').select('*').eq('entreprise_id', e),
+      sb.from('commandes').select('*').eq('entreprise_id', e).order('date', { ascending: false }),
+      sb.from('commande_lignes').select('*').eq('entreprise_id', e),
+      sb.from('charges').select('*').eq('entreprise_id', e).order('date', { ascending: false }),
       sb.from('parametres').select('*').eq('user_id', u).maybeSingle()
     ]);
     const err = [prod, cli, ven, vli, cmd, cli2, chg, par].find(r => r.error);
@@ -925,32 +997,37 @@ const API = {
     const ic = Object.fromEntries(commandes.map(c => [c.id, c]));
     for (const l of cli2.data || []) ic[l.commande_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, cout: toNum(l.cout) });
 
-    const p = par.data || {};
+    const pa = par.data || {};
     return {
+      entreprises: ents,
       produits: (prod.data || []).map(Convertir.produit),
       clients: (cli.data || []).map(Convertir.client),
       ventes, commandes,
       charges: (chg.data || []).map(Convertir.charge),
       settings: {
-        objectif: toNum(p.objectif ?? 3000), devise: 'EUR',
-        alertesStock: p.alertes_stock ?? true,
-        assujettiTVA: p.assujetti_tva ?? false,
-        tvaTaux: toNum(p.tva_taux ?? 20)
+        objectif: courante ? courante.objectif : 3000, devise: 'EUR',
+        alertesStock: pa.alertes_stock ?? true,
+        assujettiTVA: pa.assujetti_tva ?? false,
+        tvaTaux: toNum(pa.tva_taux ?? 20),
+        accent: pa.theme_accent || '#2E8BFF',
+        fond: pa.theme_fond || 'marine'
       }
     };
   },
 
+  /* champs communs à toute écriture : propriétaire + activité */
+  base() { return { user_id: S.user.id, entreprise_id: S.ent }; },
+
   async saveVente(rec) {
-    const u = this.uid();
     const { data, error } = await sb.from('ventes').upsert({
-      id: rec.id, user_id: u, client_id: rec.clientId || null, date: rec.date,
+      id: rec.id, ...this.base(), client_id: rec.clientId || null, date: rec.date,
       moyen: rec.moyen, statut: rec.statut, remise: rec.remise, notes: rec.notes
     }).select().single();
     if (boum(error)) return null;
     await sb.from('vente_lignes').delete().eq('vente_id', data.id);
     if (rec.lignes.length) {
       const { error: e2 } = await sb.from('vente_lignes').insert(
-        rec.lignes.map(l => ({ vente_id: data.id, user_id: u, produit_id: l.produitId, qte: l.qte, prix: l.prix })));
+        rec.lignes.map(l => ({ vente_id: data.id, ...this.base(), produit_id: l.produitId, qte: l.qte, prix: l.prix })));
       if (boum(e2)) return null;
     }
     return data.id;
@@ -962,9 +1039,8 @@ const API = {
   },
 
   async saveCommande(rec) {
-    const u = this.uid();
     const { data, error } = await sb.from('commandes').upsert({
-      id: rec.id, user_id: u, fournisseur: rec.fournisseur, date: rec.date,
+      id: rec.id, ...this.base(), fournisseur: rec.fournisseur, date: rec.date,
       statut: rec.statut, frais: rec.frais, notes: rec.notes,
       date_reception: rec.dateReception || null
     }).select().single();
@@ -972,7 +1048,7 @@ const API = {
     await sb.from('commande_lignes').delete().eq('commande_id', data.id);
     if (rec.lignes.length) {
       const { error: e2 } = await sb.from('commande_lignes').insert(
-        rec.lignes.map(l => ({ commande_id: data.id, user_id: u, produit_id: l.produitId, qte: l.qte, cout: l.cout })));
+        rec.lignes.map(l => ({ commande_id: data.id, ...this.base(), produit_id: l.produitId, qte: l.qte, cout: l.cout })));
       if (boum(e2)) return null;
     }
     return data.id;
@@ -985,7 +1061,7 @@ const API = {
 
   async saveClient(rec) {
     const { data, error } = await sb.from('clients').upsert({
-      id: rec.id, user_id: this.uid(), nom: rec.nom, contact: rec.contact, ville: rec.ville,
+      id: rec.id, ...this.base(), nom: rec.nom, contact: rec.contact, ville: rec.ville,
       tel: rec.tel, email: rec.email, secteur: rec.secteur, statut: rec.statut, notes: rec.notes
     }).select().single();
     return boum(error) ? null : data.id;
@@ -993,7 +1069,7 @@ const API = {
 
   async saveProduit(rec) {
     const { data, error } = await sb.from('produits').upsert({
-      id: rec.id, user_id: this.uid(), nom: rec.nom, reference: rec.ref,
+      id: rec.id, ...this.base(), nom: rec.nom, reference: rec.ref,
       cout_ref: rec.coutRef, prix_ref: rec.prixRef, seuil: rec.seuil, actif: rec.actif
     }).select().single();
     return boum(error) ? null : data.id;
@@ -1001,17 +1077,50 @@ const API = {
 
   async saveCharge(rec) {
     const { data, error } = await sb.from('charges').upsert({
-      id: rec.id, user_id: this.uid(), libelle: rec.libelle,
+      id: rec.id, ...this.base(), libelle: rec.libelle,
       categorie: rec.categorie, montant: rec.montant, date: rec.date
     }).select().single();
     return boum(error) ? null : data.id;
   },
 
-  async saveParametres(s) {
+  async saveParametres(st) {
     const { error } = await sb.from('parametres').upsert({
-      user_id: this.uid(), objectif: s.objectif, alertes_stock: s.alertesStock,
-      assujetti_tva: s.assujettiTVA, tva_taux: s.tvaTaux
+      user_id: S.user.id, alertes_stock: st.alertesStock,
+      assujetti_tva: st.assujettiTVA, tva_taux: st.tvaTaux,
+      theme_accent: st.accent, theme_fond: st.fond
     });
+    return !boum(error);
+  },
+
+  /* ---- activités ---- */
+  async saveEntreprise(rec) {
+    const champs = { nom: rec.nom, secteur: rec.secteur, objectif: rec.objectif, couleur: rec.couleur };
+    if (rec.enseigne !== undefined) Object.assign(champs, {
+      enseigne: rec.enseigne, adresse: rec.adresse, siret: rec.siret,
+      telephone: rec.telephone, email_pro: rec.emailPro
+    });
+    const { error } = await sb.from('entreprises').update(champs).eq('id', rec.id);
+    return !boum(error);
+  },
+
+  async saveProfil(rec) {
+    const { error } = await sb.from('profiles').update({
+      prenom: rec.prenom, nom_famille: rec.nomFamille, telephone: rec.telephone,
+      nom: [rec.prenom, rec.nomFamille].filter(Boolean).join(' ').trim() || rec.prenom
+    }).eq('id', S.user.id);
+    return !boum(error);
+  },
+  async creerActivite(nom, secteur, avecCatalogue) {
+    const { data, error } = await sb.rpc('creer_activite',
+      { p_nom: nom, p_secteur: secteur, p_avec_catalogue: avecCatalogue });
+    return boum(error) ? null : data;
+  },
+  async viderActivite(id) {
+    const { error } = await sb.rpc('vider_activite', { cible: id });
+    return !boum(error);
+  },
+  async supprimerActivite(id) {
+    const { error } = await sb.from('entreprises').delete().eq('id', id);
     return !boum(error);
   },
 
@@ -1021,7 +1130,7 @@ const API = {
   },
 
   async reinitialiser() {
-    const { error } = await sb.rpc('reinitialiser_mes_donnees');
+    const { error } = await sb.rpc('vider_activite', { cible: S.ent });
     return !boum(error);
   },
 
@@ -1032,10 +1141,49 @@ const API = {
   }
 };
 
+/* ---------- Apparence ---------- */
+const ACCENTS = [
+  { n: 'Bleu',    c: '#2E8BFF', soft: '#5AC8FA', deep: '#0A5FD1' },
+  { n: 'Violet',  c: '#A78BFA', soft: '#C4B0FF', deep: '#6E45E2' },
+  { n: 'Vert',    c: '#32D74B', soft: '#6EE787', deep: '#1E9E36' },
+  { n: 'Turquoise', c: '#2DD4BF', soft: '#7DF0E2', deep: '#0F9488' },
+  { n: 'Orange',  c: '#FF8A5B', soft: '#FFB48F', deep: '#E05A28' },
+  { n: 'Rose',    c: '#FF6B9D', soft: '#FFA0C0', deep: '#D63C74' },
+  { n: 'Or',      c: '#FFB020', soft: '#FFD06B', deep: '#D98A00' },
+  { n: 'Rouge',   c: '#FF453A', soft: '#FF8078', deep: '#C9271D' }
+];
+const FONDS = {
+  marine:  { n: 'Marine',    v: ['#12305C', '#071224', '#040A15'] },
+  nuit:    { n: 'Nuit',      v: ['#1A1A24', '#0C0C12', '#050508'] },
+  ardoise: { n: 'Ardoise',   v: ['#2A3442', '#141A22', '#080B0F'] },
+  ocean:   { n: 'Océan',     v: ['#0D4A52', '#06212A', '#020D12'] },
+  prune:   { n: 'Prune',     v: ['#3A1D4E', '#1B0E28', '#0A0512'] },
+  foret:   { n: 'Forêt',     v: ['#153D2E', '#081E16', '#030D09'] }
+};
+
+function appliquerTheme(st) {
+  const r = document.documentElement.style;
+  const a = ACCENTS.find(x => x.c === (st?.accent || '#2E8BFF')) || ACCENTS[0];
+  r.setProperty('--accent', a.c);
+  r.setProperty('--accent-soft', a.soft);
+  r.setProperty('--accent-deep', a.deep);
+  const f = FONDS[st?.fond] || FONDS.marine;
+  r.setProperty('--bg-1', f.v[0]);
+  r.setProperty('--bg-2', f.v[1]);
+  r.setProperty('--bg-3', f.v[2]);
+  r.setProperty('--orb-1', a.c + '55');
+  r.setProperty('--orb-2', a.deep + '3d');
+  r.setProperty('--orb-3', a.soft + '33');
+  const m = document.querySelector('meta[name=theme-color]');
+  if (m) m.setAttribute('content', f.v[2]);
+}
+
 /* Recharge la base depuis Supabase puis rafraîchit l'écran courant. */
 async function recharger(silencieux) {
   try {
     S.db = await API.chargerTout();
+    appliquerTheme(S.db.settings);
+    peindreActivite();
     if (!silencieux) { buildNav(); render(); }
   } catch (e) {
     console.error(e);
@@ -1062,6 +1210,9 @@ async function openSession() {
     id: user.id,
     email: user.email,
     name: prof?.nom || user.user_metadata?.nom || user.email.split('@')[0],
+    prenom: prof?.prenom || '',
+    nomFamille: prof?.nom_famille || '',
+    telephone: prof?.telephone || '',
     createdAt: prof?.created_at || user.created_at,
     isAdmin: user.email === ADMIN_EMAIL
   };
@@ -1080,6 +1231,8 @@ async function openSession() {
   $('#userChip').textContent = initials(S.user.name);
   $('#userChip').classList.toggle('adm', S.user.isAdmin);
   $('#brandSub').textContent = S.user.isAdmin ? 'Administrateur' : "Gestion d'activité";
+  appliquerTheme(S.db.settings);
+  peindreActivite();
   buildNav();
   go('dash');
   return true;
@@ -1227,6 +1380,14 @@ const NAV = [
   ]}
 ];
 const TABS = ['dash', 'ventes', 'commandes', 'stock', 'clients'];
+
+function peindreActivite() {
+  const e = (S.db?.entreprises || []).find(x => x.id === S.ent);
+  const el = $('#entNom');
+  if (el) el.textContent = e ? e.nom : '—';
+  const d = $('#entDot');
+  if (d && e) d.style.background = e.couleur || 'var(--accent)';
+}
 
 function buildNav() {
   const alertN = Calc.alertes().filter(a => a.n === 'r' || a.n === 'o').length;
@@ -1589,7 +1750,11 @@ function viewVentes() {
             <div class="t"><b>${esc(nm)}</b><span>${v.moyen || 'Paiement non précisé'}</span></div></div></td>
           <td style="color:var(--ink-3);white-space:nowrap">${dfr(v.date)}</td>
           <td style="color:var(--ink-2);font-size:12.5px">${v.lignes.map(l => `${l.qte}× ${esc(produitName(l.produitId))}`).join('<br>')}</td>
-          <td>${statutVentePill(v.statut)}</td>
+          <td><select class="statut-sel ${{ payee: 'g', attente: 'o', annulee: 'n' }[v.statut]}" data-ventestatut="${v.id}">
+            <option value="payee" ${v.statut === 'payee' ? 'selected' : ''}>Payée</option>
+            <option value="attente" ${v.statut === 'attente' ? 'selected' : ''}>En attente</option>
+            <option value="annulee" ${v.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
+          </select></td>
           <td class="num" style="color:#6EE787;font-weight:620">${eur(Calc.margeVente(v))}</td>
           <td class="num str">${eur(Calc.totalVente(v))}</td>
           <td><div class="row-act">
@@ -1639,6 +1804,12 @@ function viewCommandes() {
     ${kpiCard('En cours de livraison', num(enRoute.length), 'i-clock', '#FFD426', `<span>${eur(enRoute.reduce((s, c) => s + Calc.totalCommande(c), 0))} engagés</span>`)}
   </div>
 
+  ${enRoute.length ? `<div class="alert b" style="margin-bottom:15px">
+    <svg viewBox="0 0 24 24"><use href="#i-info"/></svg>
+    <div class="t"><b>${enRoute.length} commande${enRoute.length > 1 ? 's' : ''} pas encore réceptionnée${enRoute.length > 1 ? 's' : ''}</b>
+      <span>Le stock n'augmente qu'au passage en « Reçue ». Changez le statut dans la colonne prévue à cet effet.</span></div>
+  </div>` : ''}
+
   <div class="glass card">
     <div class="filters">
       <select class="inp" data-filter="commandes:statut">
@@ -1661,7 +1832,12 @@ function viewCommandes() {
         <td style="color:var(--ink-3);white-space:nowrap">${dfr(c.date)}</td>
         <td style="color:var(--ink-2);font-size:12.5px">${c.lignes.map(l => `${l.qte}× ${esc(produitName(l.produitId))} <span style="color:var(--ink-4)">à ${eur(l.cout)}</span>`).join('<br>')}</td>
         <td class="num" style="color:var(--ink-3)">${c.frais ? eur(c.frais) : '—'}</td>
-        <td>${statutCmdPill(c.statut)}</td>
+        <td><select class="statut-sel ${{ recue: 'g', transit: 'b', commandee: 'o', annulee: 'n' }[c.statut]}" data-cmdstatut="${c.id}">
+          <option value="commandee" ${c.statut === 'commandee' ? 'selected' : ''}>Commandée</option>
+          <option value="transit" ${c.statut === 'transit' ? 'selected' : ''}>En transit</option>
+          <option value="recue" ${c.statut === 'recue' ? 'selected' : ''}>Reçue</option>
+          <option value="annulee" ${c.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
+        </select></td>
         <td class="num str">${eur(Calc.totalCommande(c))}</td>
         <td><div class="row-act">
           ${c.statut !== 'recue' && c.statut !== 'annulee' ? `<button class="btn ico sm suc" data-act="receptionner:${c.id}" title="Réceptionner"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg></button>` : ''}
@@ -1817,7 +1993,7 @@ function viewCatalogue() {
   const rows = S.db.produits.filter(p => !S.search || p.nom.toLowerCase().includes(S.search.toLowerCase()));
   return `
   <div class="head">
-    <div><h1>Catalogue</h1><p>Vos références, leurs tarifs de référence et leur seuil d'alerte.</p></div>
+    <div><h1>Catalogue</h1><p>Vos références sont entièrement modifiables : renommez-les, changez les prix, supprimez celles qui ne vous servent pas.</p></div>
     <div class="spacer"></div>
     <button class="btn pri" data-act="newProduit"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouveau produit</button>
   </div>
@@ -2031,11 +2207,15 @@ function viewRapports() {
 function viewParams() {
   const st = S.db.settings;
   const nb = { v: S.db.ventes.length, c: S.db.commandes.length, cl: S.db.clients.length, p: S.db.produits.length, ch: S.db.charges.length };
+  const ents = S.db.entreprises || [];
+  const cur = ents.find(e => e.id === S.ent);
+
   return `
-  <div class="head"><div><h1>Réglages</h1><p>Votre compte, vos objectifs et vos données.</p></div></div>
+  <div class="head"><div><h1>Réglages</h1><p>Vos activités, l'apparence et vos données.</p></div></div>
 
   <div class="grid g2">
     <div style="display:flex;flex-direction:column;gap:15px">
+
       <div class="glass card">
         <div class="card-h">
           <div class="avatar ${S.user.isAdmin ? 'adm' : ''}" style="cursor:default">${initials(S.user.name)}</div>
@@ -2044,28 +2224,75 @@ function viewParams() {
         <div class="sw-row"><div class="t"><b>Type de compte</b><span>Définit les écrans auxquels vous avez accès</span></div>
           <span class="pill ${S.user.isAdmin ? 'o' : 'b'}">${S.user.isAdmin ? 'Administrateur' : 'Utilisateur'}</span></div>
         <div class="sw-row"><div class="t"><b>Compte créé le</b><span>${new Date(S.user.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div></div>
-        <div class="sw-row"><div class="t"><b>Stockage des données</b><span>Supabase — synchronisé sur tous vos appareils</span></div></div>
-        <button class="btn dgr block" data-act="logout" style="margin-top:15px">
+
+        <div class="divider"></div>
+        <div class="form-grid">
+          <div class="field"><label for="uPrenom">Prénom</label>
+            <input class="inp" id="uPrenom" type="text" placeholder="Paul" value="${esc(S.user.prenom)}"></div>
+          <div class="field"><label for="uNom">Nom</label>
+            <input class="inp" id="uNom" type="text" placeholder="Remy" value="${esc(S.user.nomFamille)}"></div>
+          <div class="field full"><label for="uTel">Téléphone</label>
+            <input class="inp" id="uTel" type="tel" placeholder="06 12 34 56 78" value="${esc(S.user.telephone)}">
+            <span class="hint">Vos coordonnées de vendeur, réutilisables sur vos documents commerciaux.</span></div>
+        </div>
+        <button class="btn pri block" data-act="saveProfil" style="margin-top:15px">Enregistrer mes coordonnées</button>
+
+        <button class="btn dgr block" data-act="logout" style="margin-top:9px">
           <svg viewBox="0 0 24 24"><use href="#i-out"/></svg>Se déconnecter</button>
       </div>
 
       <div class="glass card">
-        <div class="card-h"><div><h3>Objectif commercial</h3><div class="sub">Suivi affiché sur le tableau de bord</div></div></div>
+        <div class="card-h"><div><h3>Vos activités</h3><div class="sub">Chaque activité a son propre stock, ses clients et ses chiffres</div></div>
+          <div class="spacer"></div>
+          <button class="btn sm pri" data-act="newActivite"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Ajouter</button></div>
+        ${ents.map(e => `
+          <div class="sw-row" style="gap:11px">
+            <span style="width:11px;height:11px;border-radius:50%;flex:none;background:${esc(e.couleur)}"></span>
+            <div class="t"><b>${esc(e.nom)}${e.id === S.ent ? ' <span class="pill b np" style="font-size:10px;padding:1px 7px">ouverte</span>' : ''}</b>
+              <span>${esc(e.enseigne && e.enseigne !== e.nom ? e.enseigne + ' · ' : '')}${esc(e.secteur || 'secteur non renseigné')} · objectif ${eur0(e.objectif)}/mois</span></div>
+            ${e.id !== S.ent ? `<button class="btn sm" data-act="switchEnt:${e.id}">Ouvrir</button>` : ''}
+            <button class="btn ico sm" data-act="editActivite:${e.id}" title="Modifier"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+            ${ents.length > 1 ? `<button class="btn ico sm dgr" data-act="delActivite:${e.id}" title="Supprimer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>` : ''}
+          </div>`).join('')}
+      </div>
+
+      <div class="glass card">
+        <div class="card-h"><div><h3>Objectif commercial</h3><div class="sub">Pour ${esc(cur ? cur.nom : 'cette activité')}, affiché sur le tableau de bord</div></div></div>
         <div class="field">
-          <label for="setObj">Objectif de chiffre d'affaires mensuel</label>
+          <label for="setObj">Chiffre d'affaires visé chaque mois</label>
           <input class="inp" id="setObj" type="number" min="0" step="50" value="${st.objectif}">
-          <span class="hint">Utilisé pour l'anneau de progression et les alertes de fin de mois.</span>
         </div>
         <button class="btn pri" data-act="saveObj" style="margin-top:15px">Enregistrer l'objectif</button>
       </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:15px">
+
+      <div class="glass card">
+        <div class="card-h"><div><h3>Apparence</h3><div class="sub">Le changement est immédiat</div></div></div>
+        <div class="field" style="margin-bottom:18px">
+          <label>Couleur d'accent</label>
+          <div class="swatches">
+            ${ACCENTS.map(a => `<button class="sw-col ${st.accent === a.c ? 'on' : ''}" data-act="setAccent:${a.c}"
+              title="${a.n}" style="background:linear-gradient(145deg,${a.soft},${a.deep})"></button>`).join('')}
+          </div>
+        </div>
+        <div class="field">
+          <label>Fond de l'application</label>
+          <div class="fond-list">
+            ${Object.entries(FONDS).map(([k, f]) => `
+              <div class="fond-op ${st.fond === k ? 'on' : ''}" data-act="setFond:${k}">
+                <div class="apercu" style="background:radial-gradient(120% 120% at 50% 0%, ${f.v[0]}, ${f.v[1]} 55%, ${f.v[2]})"></div>
+                <b>${f.n}</b></div>`).join('')}
+          </div>
+        </div>
+      </div>
+
       <div class="glass card">
         <div class="card-h"><div><h3>Préférences</h3></div></div>
-        <div class="sw-row"><div class="t"><b>Alertes de stock bas</b><span>Affiche un avertissement dès qu'un produit passe sous son seuil</span></div>
+        <div class="sw-row"><div class="t"><b>Alertes de stock bas</b><span>Prévient dès qu'un produit passe sous son seuil</span></div>
           <div class="sw ${st.alertesStock ? 'on' : ''}" data-act="toggle:alertesStock"></div></div>
-        <div class="sw-row"><div class="t"><b>Assujetti à la TVA</b><span>Affiche les montants HT et la TVA collectée sur les rapports</span></div>
+        <div class="sw-row"><div class="t"><b>Assujetti à la TVA</b><span>Affiche les montants HT et la TVA collectée</span></div>
           <div class="sw ${st.assujettiTVA ? 'on' : ''}" data-act="toggle:assujettiTVA"></div></div>
         ${st.assujettiTVA ? `<div class="field" style="margin-top:13px">
           <label for="setTva">Taux de TVA applicable (%)</label>
@@ -2074,12 +2301,13 @@ function viewParams() {
       </div>
 
       <div class="glass card">
-        <div class="card-h"><div><h3>Vos données</h3><div class="sub">${nb.v} ventes · ${nb.c} commandes · ${nb.cl} clients · ${nb.p} produits · ${nb.ch} charges</div></div></div>
+        <div class="card-h"><div><h3>Données de ${esc(cur ? cur.nom : 'cette activité')}</h3>
+          <div class="sub">${nb.v} ventes · ${nb.c} commandes · ${nb.cl} clients · ${nb.p} produits · ${nb.ch} charges</div></div></div>
         <div style="display:flex;flex-direction:column;gap:9px">
-          <button class="btn block" data-act="exportGlobal"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter toutes mes données (JSON)</button>
+          <button class="btn block" data-act="exportGlobal"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter en JSON</button>
           <button class="btn block" data-act="exportVentes"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter les ventes (CSV)</button>
           ${!nb.v && !nb.c ? `<button class="btn block" data-act="seedDemo"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg>Charger un jeu de démonstration</button>` : ''}
-          <button class="btn dgr block" data-act="resetData"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg>Effacer toutes mes données</button>
+          <button class="btn dgr block" data-act="resetData"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg>Vider cette activité</button>
         </div>
       </div>
 
@@ -2095,6 +2323,102 @@ function viewParams() {
       </div>
     </div>
   </div>`;
+}
+
+/* ---------- Modale ACTIVITÉ ---------- */
+function modalActivite(id) {
+  const e = id ? S.db.entreprises.find(x => x.id === id) : null;
+  openModal(`<div class="sheet">
+    <div class="sheet-h"><div><h2>${e ? 'Modifier l\'activité' : 'Nouvelle activité'}</h2>
+      <p>${e ? 'Le nom apparaît en haut de l\'écran.' : 'Elle démarre avec son propre stock, vierge de toute donnée.'}</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b"><div class="form-grid">
+      <div class="field full"><label for="eNom">Nom de l'activité</label>
+        <input class="inp" id="eNom" type="text" placeholder="Revente de cartes NFC" value="${esc(e?.nom || '')}"></div>
+      <div class="field"><label for="eSecteur">Secteur</label>
+        <input class="inp" id="eSecteur" type="text" placeholder="Commerce, artisanat…" value="${esc(e?.secteur || '')}"></div>
+      <div class="field"><label for="eObj">Objectif mensuel (€)</label>
+        <input class="inp" id="eObj" type="number" min="0" step="50" value="${e?.objectif ?? 3000}"></div>
+      ${e ? `
+      <div class="field full"><label for="eEnseigne">Nom de l'enseigne</label>
+        <input class="inp" id="eEnseigne" type="text" placeholder="ScanAvis" value="${esc(e.enseigne || '')}">
+        <span class="hint">Le nom commercial que voient vos clients.</span></div>
+      <div class="field"><label for="eTel">Téléphone professionnel</label>
+        <input class="inp" id="eTel" type="tel" placeholder="06 12 34 56 78" value="${esc(e.telephone || '')}"></div>
+      <div class="field"><label for="eMail">E-mail professionnel</label>
+        <input class="inp" id="eMail" type="email" placeholder="contact@enseigne.fr" value="${esc(e.emailPro || '')}"></div>
+      <div class="field"><label for="eSiret">SIRET</label>
+        <input class="inp" id="eSiret" type="text" placeholder="123 456 789 00012" value="${esc(e.siret || '')}"></div>
+      <div class="field"><label for="eAdresse">Adresse</label>
+        <input class="inp" id="eAdresse" type="text" placeholder="12 rue des Halles, La Rochelle" value="${esc(e.adresse || '')}"></div>
+      ` : ''}
+      <div class="field full"><label>Couleur de repère</label>
+        <div class="swatches" id="eCouleurs">
+          ${ACCENTS.map(a => `<button class="sw-col ${(e?.couleur || '#2E8BFF') === a.c ? 'on' : ''}" data-col="${a.c}"
+            style="background:linear-gradient(145deg,${a.soft},${a.deep})"></button>`).join('')}
+        </div>
+        <span class="hint">Sert à distinguer vos activités dans le sélecteur.</span></div>
+      ${e ? '' : `<div class="full sw-row"><div class="t"><b>Partir d'un catalogue d'exemple</b>
+        <span>Quatre références NFC que vous pourrez renommer, modifier ou supprimer. Décochez pour démarrer avec un catalogue vide.</span></div>
+        <div class="sw on" id="eCatalogue"></div></div>`}
+    </div></div>
+    <div class="sheet-f">
+      ${e ? `<button class="btn dgr" data-act="videActivite:${e.id}">Vider les données</button>` : ''}
+      <div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveEnt">${e ? 'Enregistrer' : 'Créer l\'activité'}</button></div>
+  </div>`);
+
+  let couleur = e?.couleur || '#2E8BFF';
+  $('#eCouleurs').querySelectorAll('[data-col]').forEach(b => b.onclick = () => {
+    couleur = b.dataset.col;
+    $('#eCouleurs').querySelectorAll('[data-col]').forEach(x => x.classList.toggle('on', x === b));
+  });
+  const swCat = $('#eCatalogue');
+  if (swCat) swCat.onclick = () => swCat.classList.toggle('on');
+
+  $('#saveEnt').onclick = async () => {
+    const nom = $('#eNom').value.trim();
+    if (!nom) { $('#eNom').classList.add('err'); return toast('Donnez un nom à cette activité.', 'er'); }
+    const obj = Math.max(0, parseFloat($('#eObj').value) || 0);
+    const sect = $('#eSecteur').value.trim();
+
+    if (e) {
+      const detail = {
+        enseigne: $('#eEnseigne').value.trim(), telephone: $('#eTel').value.trim(),
+        emailPro: $('#eMail').value.trim(), siret: $('#eSiret').value.trim(),
+        adresse: $('#eAdresse').value.trim()
+      };
+      if (!await API.saveEntreprise({ id: e.id, nom, secteur: sect, objectif: obj, couleur, ...detail })) return;
+      closeModal(); await recharger(); toast('Activité mise à jour.');
+    } else {
+      const nid = await API.creerActivite(nom, sect, swCat.classList.contains('on'));
+      if (!nid) return;
+      await API.saveEntreprise({ id: nid, nom, secteur: sect, objectif: obj, couleur });
+      S.ent = nid;
+      closeModal(); await recharger(); go('dash'); toast(`${nom} est prête.`);
+    }
+  };
+}
+
+/* ---------- Sélecteur d'activité ---------- */
+function ouvrirSelecteurActivite() {
+  const ents = S.db.entreprises || [];
+  openModal(`<div class="sheet narrow">
+    <div class="sheet-h"><div><h2>Vos activités</h2><p>Chacune garde ses propres chiffres.</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b">
+      ${ents.map(e => `<div class="stock-item" data-act="switchEnt:${e.id}" style="cursor:pointer">
+        <span style="width:13px;height:13px;border-radius:50%;flex:none;background:${esc(e.couleur)}"></span>
+        <div class="t"><b>${esc(e.nom)}</b><span style="font-size:11.5px;color:var(--ink-3)">${esc(e.secteur || 'Aucun secteur')}</span></div>
+        ${e.id === S.ent ? '<span class="pill g">Ouverte</span>' : ''}
+      </div>`).join('')}
+    </div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn pri" data-act="newActivite"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle activité</button></div>
+  </div>`);
 }
 
 /* ============================================================================
@@ -2371,12 +2695,12 @@ function modalCmd(id) {
           <input class="inp" id="fDate" type="date" value="${c?.date || today()}"></div>
         <div class="field"><label for="fStatut">Statut</label>
           <select class="inp" id="fStatut">
-            <option value="commandee" ${(c?.statut || 'commandee') === 'commandee' ? 'selected' : ''}>Commandée</option>
+            <option value="recue" ${(c?.statut || 'recue') === 'recue' ? 'selected' : ''}>Reçue — entre en stock</option>
             <option value="transit" ${c?.statut === 'transit' ? 'selected' : ''}>En transit</option>
-            <option value="recue" ${c?.statut === 'recue' ? 'selected' : ''}>Reçue — entre en stock</option>
+            <option value="commandee" ${c?.statut === 'commandee' ? 'selected' : ''}>Commandée</option>
             <option value="annulee" ${c?.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
           </select>
-          <span class="hint">Le stock n'est mis à jour qu'au statut « Reçue ».</span></div>
+          <span class="hint">Seul le statut « Reçue » fait entrer la marchandise en stock.</span></div>
         <div class="field"><label for="fFrais">Frais de port et douane (€)</label>
           <input class="inp" id="fFrais" type="number" min="0" step="0.5" value="${c?.frais || 0}"></div>
       </div>
@@ -2665,7 +2989,10 @@ function exportClients() {
 }
 function exportGlobal() {
   download(`scanavis-${today()}.json`, JSON.stringify({
-    export: new Date().toISOString(), compte: { nom: S.user.name, email: S.user.email }, donnees: S.db
+    export: new Date().toISOString(),
+    compte: { nom: S.user.name, email: S.user.email },
+    activite: (S.db.entreprises || []).find(e => e.id === S.ent)?.nom || '',
+    donnees: S.db
   }, null, 2), 'application/json');
 }
 
@@ -2673,7 +3000,6 @@ function exportGlobal() {
    JEU DE DÉMONSTRATION
    ============================================================================ */
 async function seedDemo() {
-  const u = S.user.id;
   const P = S.db.produits;
   if (P.length < 3) return toast('Ajoutez au moins trois produits au catalogue.', 'er');
 
@@ -2683,7 +3009,7 @@ async function seedDemo() {
     ['Fleurs & Sens', 'Niort', 'Commerce'], ['Auto-école Cap Sud', 'La Rochelle', 'Formation']];
 
   const { data: clients, error: e1 } = await sb.from('clients').insert(
-    commerces.map((c, i) => ({ user_id: u, nom: c[0], ville: c[1], secteur: c[2], statut: i < 6 ? 'client' : 'prospect' }))
+    commerces.map((c, i) => ({ ...API.base(), nom: c[0], ville: c[1], secteur: c[2], statut: i < 6 ? 'client' : 'prospect' }))
   ).select();
   if (boum(e1)) return;
 
@@ -2693,7 +3019,7 @@ async function seedDemo() {
   const cmdRows = [];
   for (let m = 6; m >= 0; m -= 2) {
     cmdRows.push({
-      user_id: u, fournisseur: 'Shenzhen NFC Tech',
+      ...API.base(), fournisseur: 'Shenzhen NFC Tech',
       date: iso(new Date(now.getFullYear(), now.getMonth() - m, 8)),
       statut: m === 0 ? 'transit' : 'recue', frais: 45 + m * 3,
       date_reception: m === 0 ? null : iso(new Date(now.getFullYear(), now.getMonth() - m, 22)),
@@ -2708,9 +3034,9 @@ async function seedDemo() {
   cmds.forEach((c, i) => {
     const m = cmdRows[i]._m;
     cLignes.push(
-      { commande_id: c.id, user_id: u, produit_id: P[0].id, qte: 40, cout: 3.1 + m * 0.05 },
-      { commande_id: c.id, user_id: u, produit_id: P[1].id, qte: 80, cout: 1.75 },
-      { commande_id: c.id, user_id: u, produit_id: P[2].id, qte: 60, cout: 1.05 });
+      { commande_id: c.id, ...API.base(), produit_id: P[0].id, qte: 40, cout: 3.1 + m * 0.05 },
+      { commande_id: c.id, ...API.base(), produit_id: P[1].id, qte: 80, cout: 1.75 },
+      { commande_id: c.id, ...API.base(), produit_id: P[2].id, qte: 60, cout: 1.05 });
   });
   if (boum((await sb.from('commande_lignes').insert(cLignes)).error)) return;
 
@@ -2723,7 +3049,7 @@ async function seedDemo() {
       if (d > now) continue;
       const p = P[Math.floor(Math.random() * 3)];
       vRows.push({
-        user_id: u, client_id: clients[Math.floor(Math.random() * 6)].id, date: iso(d),
+        ...API.base(), client_id: clients[Math.floor(Math.random() * 6)].id, date: iso(d),
         moyen: MOYENS[Math.floor(Math.random() * MOYENS.length)],
         statut: Math.random() > 0.88 ? 'attente' : 'payee',
         remise: Math.random() > 0.8 ? 5 : 0
@@ -2734,12 +3060,12 @@ async function seedDemo() {
   const { data: ventes, error: e3 } = await sb.from('ventes').insert(vRows).select();
   if (boum(e3)) return;
   if (boum((await sb.from('vente_lignes').insert(
-    ventes.map((v, i) => ({ vente_id: v.id, user_id: u, ...vMeta[i] }))).error))) return;
+    ventes.map((v, i) => ({ vente_id: v.id, ...API.base(), ...vMeta[i] }))).error))) return;
 
   if (boum((await sb.from('charges').insert([
-    { user_id: u, libelle: 'Publicité Facebook', categorie: 'Publicité', montant: 120, date: today() },
-    { user_id: u, libelle: 'Carburant tournée commerciale', categorie: 'Déplacements', montant: 68.4, date: today() },
-    { user_id: u, libelle: 'Abonnement Canva Pro', categorie: 'Logiciels', montant: 11.99, date: today() }
+    { ...API.base(), libelle: 'Publicité Facebook', categorie: 'Publicité', montant: 120, date: today() },
+    { ...API.base(), libelle: 'Carburant tournée commerciale', categorie: 'Déplacements', montant: 68.4, date: today() },
+    { ...API.base(), libelle: 'Abonnement Canva Pro', categorie: 'Logiciels', montant: 11.99, date: today() }
   ])).error)) return;
 
   await recharger();
@@ -2819,14 +3145,18 @@ const ACTIONS = {
       <div class="sheet-f"><div class="spacer"></div><button class="btn" data-close>Annuler</button>
         <button class="btn pri" id="oSave">Enregistrer</button></div></div>`);
     $('#oSave').onclick = async () => {
-      S.db.settings.objectif = Math.max(0, parseFloat($('#oVal').value) || 0);
-      if (!await API.saveParametres(S.db.settings)) return;
+      const v = Math.max(0, parseFloat($('#oVal').value) || 0);
+      const e = S.db.entreprises.find(x => x.id === S.ent);
+      if (!e || !await API.saveEntreprise({ ...e, objectif: v })) return;
+      S.db.settings.objectif = v; e.objectif = v;
       closeModal(); render(); toast('Objectif mis à jour.');
     };
   },
   saveObj: async () => {
-    S.db.settings.objectif = Math.max(0, parseFloat($('#setObj').value) || 0);
-    if (!await API.saveParametres(S.db.settings)) return;
+    const v = Math.max(0, parseFloat($('#setObj').value) || 0);
+    const e = S.db.entreprises.find(x => x.id === S.ent);
+    if (!e || !await API.saveEntreprise({ ...e, objectif: v })) return;
+    S.db.settings.objectif = v; e.objectif = v;
     toast('Objectif enregistré.');
   },
   toggle: async key => {
@@ -2835,8 +3165,67 @@ const ACTIONS = {
     render();
   },
   clearFilters: view => { S.filters[view] = {}; S.search = ''; $('#globalSearch').value = ''; render(); },
+
+  saveProfil: async () => {
+    const rec = {
+      prenom: $('#uPrenom').value.trim(),
+      nomFamille: $('#uNom').value.trim(),
+      telephone: $('#uTel').value.trim()
+    };
+    if (!await API.saveProfil(rec)) return;
+    Object.assign(S.user, rec);
+    S.user.name = [rec.prenom, rec.nomFamille].filter(Boolean).join(' ') || S.user.name;
+    $('#userChip').textContent = initials(S.user.name);
+    render();
+    toast('Coordonnées enregistrées.');
+  },
+
+  newActivite: () => modalActivite(),
+  editActivite: id => modalActivite(id),
+  switchEnt: async id => {
+    if (id === S.ent) return closeModal();
+    S.ent = id; closeModal();
+    S.filters = {}; S.search = ''; $('#globalSearch').value = '';
+    await recharger(); go('dash');
+    const e = S.db.entreprises.find(x => x.id === id);
+    toast(`Vous êtes sur ${e ? e.nom : 'une autre activité'}.`);
+  },
+  videActivite: async id => {
+    const e = S.db.entreprises.find(x => x.id === id); if (!e) return;
+    if (!await confirmer('Vider l\'activité',
+      `Ventes, commandes, clients, produits et charges de ${e.nom} seront définitivement supprimés. L'activité, elle, est conservée.`,
+      'Tout vider')) return;
+    if (!await API.viderActivite(id)) return;
+    closeModal(); await recharger(); toast('Activité vidée.');
+  },
+  delActivite: async id => {
+    const e = S.db.entreprises.find(x => x.id === id); if (!e) return;
+    if ((S.db.entreprises || []).length < 2) return toast('Vous devez garder au moins une activité.', 'er');
+    if (!await confirmer('Supprimer l\'activité',
+      `${e.nom} et toutes ses données disparaîtront définitivement. Cette action est irréversible.`,
+      'Supprimer')) return;
+    if (!await API.supprimerActivite(id)) return;
+    if (S.ent === id) S.ent = null;
+    await recharger(); go('params'); toast('Activité supprimée.');
+  },
+  setAccent: async couleur => {
+    S.db.settings.accent = couleur;
+    appliquerTheme(S.db.settings);
+    peindreActivite();
+    render();
+    await API.saveParametres(S.db.settings);
+  },
+  setFond: async cle => {
+    S.db.settings.fond = cle;
+    appliquerTheme(S.db.settings);
+    render();
+    await API.saveParametres(S.db.settings);
+  },
   resetData: async () => {
-    if (!await confirmer('Effacer toutes vos données', 'Ventes, commandes, clients, produits et charges seront définitivement supprimés. Cette action est irréversible.', 'Tout effacer')) return;
+    const e = S.db.entreprises.find(x => x.id === S.ent);
+    if (!await confirmer('Vider cette activité',
+      `Ventes, commandes, clients, produits et charges de ${e ? e.nom : 'cette activité'} seront définitivement supprimés. Cette action est irréversible.`,
+      'Tout vider')) return;
     if (!await API.reinitialiser()) return;
     await recharger(); go('dash'); toast('Données effacées.');
   },
@@ -2898,6 +3287,19 @@ function wire() {
     (S.filters[view] || (S.filters[view] = {}))[key] = el.value;
     render();
   });
+  $$('#main [data-cmdstatut]').forEach(el => el.onchange = async () => {
+    const st = el.value;
+    const ok = await API.patchCommande(el.dataset.cmdstatut,
+      { statut: st, date_reception: st === 'recue' ? today() : null });
+    if (!ok) return;
+    await recharger();
+    toast(st === 'recue' ? 'Marchandise entrée en stock.' : 'Statut mis à jour.');
+  });
+  $$('#main [data-ventestatut]').forEach(el => el.onchange = async () => {
+    if (!await API.patchVente(el.dataset.ventestatut, { statut: el.value })) return;
+    await recharger();
+    toast(el.value === 'payee' ? 'Vente encaissée.' : 'Statut mis à jour.');
+  });
   $$('#main [data-save]').forEach(el => el.onchange = async () => {
     S.db.settings[el.dataset.save] = parseFloat(el.value) || 0; await API.saveParametres(S.db.settings);
   });
@@ -2918,6 +3320,7 @@ $('#globalSearch').addEventListener('input', e => {
 });
 
 $('#userChip').onclick = () => go('params');
+$('#entPick').onclick = () => ouvrirSelecteurActivite();
 $('#btnBell').onclick = () => {
   const a = Calc.alertes();
   if (!a.length) return toast('Rien à signaler, tout est à jour.', 'in');
