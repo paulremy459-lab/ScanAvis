@@ -662,11 +662,7 @@ select.inp option{background:#0B1B33;color:var(--ink)}
 <div id="modalRoot"></div>
 <div class="toasts" id="toasts"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script>
-/* CDN de secours si jsDelivr est bloqué ou indisponible */
-if (!window.supabase) document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>');
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ============================================================================
    SCANAVIS — gestion d'achat/revente de cartes NFC d'avis Google
@@ -693,8 +689,39 @@ function panne(titre, detail) {
     <h1 style="font-size:20px;font-weight:680;margin-bottom:10px">${titre}</h1>
     <p style="font-size:13.5px;color:var(--ink-3);line-height:1.6">${detail}</p></div>`;
 }
-window.addEventListener('error', e => panne('Une erreur est survenue',
-  'Détail technique : ' + (e.message || 'inconnu') + '. La console du navigateur en dira plus.'));
+window.addEventListener('error', e => {
+  if (window.__demarre) return;                       // l'app tourne déjà : on n'affiche rien
+  if (/^Script error\.?$/.test(e.message || '') && location.protocol === 'file:') {
+    return panne('Ouvrez la page via une adresse http',
+      "Safari bloque les scripts externes sur les fichiers ouverts en local. Déployez sur Vercel, "
+      + "ou lancez <span class='mono'>npx serve</span> dans le dossier puis ouvrez "
+      + "<span class='mono'>http://localhost:3000</span>.");
+  }
+  panne('Une erreur est survenue',
+    'Détail technique : ' + (e.message || 'inconnu') + '. La console du navigateur en dira plus.');
+});
+
+let sb = null;
+
+/* Charge supabase-js en essayant plusieurs CDN, et attend réellement le résultat. */
+async function chargerLibrairie() {
+  if (window.supabase) return true;
+  const sources = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://unpkg.com/@supabase/supabase-js@2'
+  ];
+  for (const src of sources) {
+    try {
+      await new Promise((ok, ko) => {
+        const t = document.createElement('script');
+        t.src = src; t.onload = ok; t.onerror = () => ko(new Error(src));
+        document.head.appendChild(t);
+      });
+      if (window.supabase) return true;
+    } catch (e) { console.warn('CDN indisponible :', src); }
+  }
+  return false;
+}
 
 /* Safari refuse le stockage local sur les pages ouvertes en file:// —
    on bascule alors sur un stockage en mémoire, valable le temps de l'onglet. */
@@ -705,18 +732,18 @@ const stockageSession = {
   removeItem: k => { try { window.localStorage.removeItem(k); } catch (e) { delete memoire[k]; } }
 };
 
-let sb = null;
-if (!window.supabase) {
-  panne('Librairie Supabase inaccessible',
-    "Le script supabase-js n'a pas pu être téléchargé. Vérifiez votre connexion internet ou un éventuel bloqueur de contenu.");
-} else {
-  try {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-      auth: { storage: stockageSession, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
-  } catch (e) {
-    panne('Connexion au projet impossible', 'Vérifiez SUPABASE_URL et SUPABASE_KEY. Détail : ' + e.message);
-  }
+function creerClient() {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { storage: stockageSession, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+  });
+  sb.auth.onAuthStateChange(event => {
+    if (event === 'SIGNED_OUT' && S.user) {
+      S.user = null; S.db = null;
+      $('#app').classList.add('hidden');
+      $('#authScreen').classList.remove('hidden');
+      authMode = 'login'; paintAuth();
+    }
+  });
 }
 
 /* ---------- Utilitaires ---------- */
@@ -2919,15 +2946,6 @@ go = function (view) {
   if (view === 'admin' && S.user?.isAdmin) loadAdmin().then(render);
 };
 
-sb.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT' && S.user) {
-    S.user = null; S.db = null;
-    $('#app').classList.add('hidden');
-    $('#authScreen').classList.remove('hidden');
-    authMode = 'login'; paintAuth();
-  }
-});
-
 (async function boot() {
   paintAuth();
   if (SUPABASE_URL.includes('VOTRE-REF') || !SUPABASE_KEY.startsWith('sb_')) {
@@ -2939,14 +2957,21 @@ sb.auth.onAuthStateChange((event) => {
       <span class="mono">schema.sql</span> dans l'éditeur SQL de Supabase.</p></div>`;
     return;
   }
-  if (!sb) return;                       // panne() a déjà affiché le message
+  if (!await chargerLibrairie()) {
+    return panne('Librairie Supabase inaccessible',
+      "Le script supabase-js n'a pas pu être téléchargé. Vérifiez votre connexion ou un bloqueur de contenu.");
+  }
+  try { creerClient(); }
+  catch (e) { return panne('Connexion au projet impossible',
+    'Vérifiez SUPABASE_URL et SUPABASE_KEY. Détail : ' + e.message); }
   try {
     const { data: { session } } = await Promise.race([
       sb.auth.getSession(),
       new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé')), 8000))
     ]);
-    if (session) { $('#boot').classList.add('hidden'); await openSession(); return; }
+    if (session) { window.__demarre = true; $('#boot').classList.add('hidden'); await openSession(); return; }
   } catch (e) { console.error('getSession', e); }
+  window.__demarre = true;
   $('#boot').classList.add('hidden');
   $('#authScreen').classList.remove('hidden');
 })();
