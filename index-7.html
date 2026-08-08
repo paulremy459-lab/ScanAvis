@@ -1,0 +1,2956 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#050B18">
+<title>ScanAvis — Gestion d'activité</title>
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --navy-900:#040A15;
+  --navy-800:#071224;
+  --navy-700:#0B1B33;
+  --navy-600:#122745;
+
+  --accent:#2E8BFF;
+  --accent-soft:#5AC8FA;
+  --accent-deep:#0A5FD1;
+  --success:#32D74B;
+  --warning:#FFD426;
+  --danger:#FF453A;
+  --violet:#A78BFA;
+
+  --ink:#F2F6FF;
+  --ink-2:rgba(242,246,255,.66);
+  --ink-3:rgba(242,246,255,.42);
+  --ink-4:rgba(242,246,255,.22);
+
+  --glass:rgba(255,255,255,.055);
+  --glass-2:rgba(255,255,255,.085);
+  --glass-hi:rgba(255,255,255,.14);
+  --stroke:rgba(255,255,255,.10);
+  --stroke-2:rgba(255,255,255,.18);
+
+  --r-xs:10px; --r-sm:14px; --r-md:20px; --r-lg:26px; --r-xl:34px; --r-full:999px;
+
+  --shadow-sm:0 2px 10px rgba(0,0,0,.28);
+  --shadow-md:0 12px 34px rgba(0,0,0,.38);
+  --shadow-lg:0 28px 70px rgba(0,0,0,.52);
+  --glow:0 0 0 1px rgba(46,139,255,.35), 0 10px 40px rgba(46,139,255,.28);
+
+  --blur:26px;
+  --spring:cubic-bezier(.22,1,.36,1);
+  --snap:cubic-bezier(.32,.72,0,1);
+
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
+
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--navy-900);
+  color:var(--ink);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  letter-spacing:-.011em;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;letter-spacing:inherit}
+button{background:none;border:none;cursor:pointer}
+::selection{background:rgba(46,139,255,.35)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ambient background */
+.ambient{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:
+  radial-gradient(120% 90% at 50% -10%, #12305C 0%, #071224 45%, #040A15 100%)}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 26s var(--spring) infinite alternate}
+.orb.a{width:52vmax;height:52vmax;left:-14vmax;top:-16vmax;background:radial-gradient(circle,#2E8BFF55,transparent 68%)}
+.orb.b{width:44vmax;height:44vmax;right:-14vmax;top:14vmax;background:radial-gradient(circle,#A78BFA3d,transparent 68%);animation-delay:-9s}
+.orb.c{width:40vmax;height:40vmax;left:26vmax;bottom:-20vmax;background:radial-gradient(circle,#5AC8FA33,transparent 68%);animation-delay:-16s}
+@keyframes drift{to{transform:translate3d(5vmax,-4vmax,0) scale(1.14)}}
+.grain{position:absolute;inset:0;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ============================================================
+   LIQUID GLASS
+   ============================================================ */
+.glass{
+  position:relative;
+  background:linear-gradient(160deg,var(--glass-2),var(--glass) 46%,rgba(255,255,255,.03));
+  backdrop-filter:blur(var(--blur)) saturate(190%);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(190%);
+  border:1px solid var(--stroke);
+  border-radius:var(--r-lg);
+  box-shadow:var(--shadow-md), inset 0 1px 0 rgba(255,255,255,.14), inset 0 -1px 0 rgba(0,0,0,.16);
+  overflow:hidden;
+}
+/* the specular sheen — signature detail */
+.glass::before{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.10) 44%,rgba(255,255,255,.02) 56%,transparent 70%);
+  background-size:280% 280%;background-position:0% 0%;
+  transition:background-position 1.1s var(--spring);
+}
+.glass:hover::before{background-position:100% 100%}
+
+/* ============================================================
+   SHELL
+   ============================================================ */
+#app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column}
+.hidden{display:none!important}
+
+.topbar{
+  flex:none;display:flex;align-items:center;gap:14px;
+  padding:14px 22px;
+  background:linear-gradient(180deg,rgba(7,18,36,.86),rgba(7,18,36,.42));
+  backdrop-filter:blur(22px) saturate(180%);
+  -webkit-backdrop-filter:blur(22px) saturate(180%);
+  border-bottom:1px solid var(--stroke);
+  z-index:40;
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand-mark{
+  width:34px;height:34px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,var(--accent),var(--accent-deep));
+  box-shadow:0 6px 18px rgba(46,139,255,.42), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.brand-mark svg{width:19px;height:19px}
+.brand-txt{display:flex;flex-direction:column;line-height:1.1;min-width:0}
+.brand-txt b{font-size:15px;font-weight:640;letter-spacing:-.02em}
+.brand-txt span{font-size:10.5px;color:var(--ink-3);font-weight:520;letter-spacing:.04em;text-transform:uppercase}
+
+.spacer{flex:1}
+
+.search-wrap{position:relative;max-width:330px;flex:1}
+.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-3);pointer-events:none}
+.search{
+  width:100%;height:36px;padding:0 12px 0 34px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+  font-size:13.5px;transition:.25s var(--spring);
+}
+.search:focus{outline:none;background:rgba(255,255,255,.1);border-color:rgba(46,139,255,.5);box-shadow:0 0 0 4px rgba(46,139,255,.14)}
+.search::placeholder{color:var(--ink-3)}
+
+.avatar{
+  width:34px;height:34px;border-radius:var(--r-full);flex:none;
+  display:grid;place-items:center;font-size:12.5px;font-weight:680;letter-spacing:.01em;
+  background:linear-gradient(150deg,#2E8BFF,#6E45E2);color:#fff;
+  box-shadow:0 4px 14px rgba(46,139,255,.4), inset 0 1px 0 rgba(255,255,255,.35);
+  cursor:pointer;transition:.25s var(--spring);
+}
+.avatar:hover{transform:scale(1.07)}
+.avatar.adm{background:linear-gradient(150deg,#FFB020,#FF6B35);box-shadow:0 4px 14px rgba(255,176,32,.4), inset 0 1px 0 rgba(255,255,255,.4)}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* sidebar */
+.rail{
+  flex:none;width:224px;padding:16px 12px;display:flex;flex-direction:column;gap:3px;
+  border-right:1px solid var(--stroke);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  overflow-y:auto;
+}
+.rail-lbl{font-size:10.5px;font-weight:640;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-4);padding:16px 12px 7px}
+.navb{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:9.5px 12px;border-radius:var(--r-sm);
+  font-size:13.5px;font-weight:540;color:var(--ink-2);
+  transition:.22s var(--spring);position:relative;text-align:left;
+}
+.navb svg{width:17px;height:17px;flex:none;opacity:.8}
+.navb:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+.navb.on{
+  background:linear-gradient(140deg,rgba(46,139,255,.26),rgba(46,139,255,.11));
+  color:#fff;font-weight:600;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 4px 16px rgba(46,139,255,.2);
+  border:1px solid rgba(46,139,255,.3);
+}
+.navb.on svg{opacity:1;color:var(--accent-soft)}
+.navb .pip{margin-left:auto;min-width:19px;height:19px;padding:0 5px;border-radius:var(--r-full);
+  background:var(--danger);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center}
+.navb.adm.on{background:linear-gradient(140deg,rgba(255,176,32,.26),rgba(255,176,32,.1));border-color:rgba(255,176,32,.32);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 16px rgba(255,176,32,.18)}
+.navb.adm.on svg{color:#FFC94D}
+
+/* main */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:26px 30px 60px;scroll-behavior:smooth}
+.main::-webkit-scrollbar,.rail::-webkit-scrollbar,.tbl-scroll::-webkit-scrollbar{width:9px;height:9px}
+.main::-webkit-scrollbar-thumb,.rail::-webkit-scrollbar-thumb,.tbl-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+.main::-webkit-scrollbar-track{background:transparent}
+
+.view{animation:viewIn .42s var(--spring)}
+@keyframes viewIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.head h1{font-size:29px;font-weight:680;letter-spacing:-.032em;line-height:1.1}
+.head p{font-size:13.5px;color:var(--ink-3);margin-top:5px;font-weight:480}
+.head .spacer{flex:1}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:38px;padding:0 17px;border-radius:var(--r-full);
+  font-size:13.5px;font-weight:590;letter-spacing:-.008em;white-space:nowrap;
+  border:1px solid var(--stroke-2);background:rgba(255,255,255,.07);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transition:.22s var(--spring);
+}
+.btn svg{width:15.5px;height:15.5px}
+.btn:hover{background:rgba(255,255,255,.12);transform:translateY(-1px)}
+.btn:active{transform:scale(.965)}
+.btn.pri{
+  background:linear-gradient(140deg,var(--accent),var(--accent-deep));
+  border-color:rgba(255,255,255,.22);color:#fff;
+  box-shadow:0 6px 20px rgba(46,139,255,.4), inset 0 1px 0 rgba(255,255,255,.32);
+}
+.btn.pri:hover{box-shadow:0 10px 30px rgba(46,139,255,.52), inset 0 1px 0 rgba(255,255,255,.38)}
+.btn.dgr{background:rgba(255,69,58,.16);border-color:rgba(255,69,58,.34);color:#FF8078}
+.btn.dgr:hover{background:rgba(255,69,58,.26)}
+.btn.suc{background:rgba(50,215,75,.15);border-color:rgba(50,215,75,.32);color:#6EE787}
+.btn.gho{background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn.gho:hover{background:rgba(255,255,255,.07);color:var(--ink)}
+.btn.sm{height:31px;padding:0 12px;font-size:12.5px;border-radius:var(--r-full)}
+.btn.sm svg{width:13.5px;height:13.5px}
+.btn.ico{width:34px;height:34px;padding:0;border-radius:var(--r-full)}
+.btn.ico.sm{width:29px;height:29px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.42;pointer-events:none}
+
+/* segmented control */
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.055);border:1px solid var(--stroke);backdrop-filter:blur(14px)}
+.seg button{padding:6.5px 15px;border-radius:var(--r-full);font-size:12.5px;font-weight:560;
+  color:var(--ink-3);transition:.24s var(--spring);white-space:nowrap}
+.seg button:hover{color:var(--ink-2)}
+.seg button.on{background:linear-gradient(140deg,rgba(255,255,255,.2),rgba(255,255,255,.1));
+  color:#fff;font-weight:620;box-shadow:0 2px 10px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.24)}
+
+/* ============================================================
+   CARDS / GRID
+   ============================================================ */
+.grid{display:grid;gap:15px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g-23{grid-template-columns:1.35fr 1fr}
+.card{padding:19px}
+.card-h{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+.card-h h3{font-size:14.5px;font-weight:620;letter-spacing:-.015em}
+.card-h .sub{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.card-h .spacer{flex:1}
+
+/* KPI */
+.kpi{padding:17px 18px;display:flex;flex-direction:column;gap:11px;min-height:118px}
+.kpi-top{display:flex;align-items:flex-start;gap:10px}
+.kpi-ico{width:33px;height:33px;border-radius:11px;display:grid;place-items:center;flex:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+.kpi-ico svg{width:16px;height:16px}
+.kpi-lbl{font-size:11.5px;font-weight:580;color:var(--ink-3);letter-spacing:.02em;text-transform:uppercase}
+.kpi-val{font-size:27px;font-weight:700;letter-spacing:-.038em;line-height:1;font-variant-numeric:tabular-nums}
+.kpi-val small{font-size:15px;font-weight:600;color:var(--ink-3);margin-left:2px;letter-spacing:-.02em}
+.kpi-foot{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);font-weight:500;margin-top:auto}
+.trend{display:inline-flex;align-items:center;gap:3px;padding:2.5px 7px;border-radius:var(--r-full);
+  font-size:11px;font-weight:660;font-variant-numeric:tabular-nums}
+.trend.up{background:rgba(50,215,75,.15);color:#6EE787}
+.trend.dn{background:rgba(255,69,58,.15);color:#FF8078}
+.trend.fl{background:rgba(255,255,255,.08);color:var(--ink-3)}
+.trend svg{width:11px;height:11px}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+.tbl-scroll{overflow-x:auto;margin:0 -19px;padding:0 19px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  text-align:left;padding:0 13px 10px;font-size:10.5px;font-weight:660;
+  letter-spacing:.075em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap;
+  cursor:pointer;user-select:none;transition:color .2s;
+}
+thead th:hover{color:var(--ink-2)}
+thead th.nos{cursor:default}
+thead th.nos:hover{color:var(--ink-4)}
+thead th .ar{opacity:0;margin-left:4px;font-size:9px;transition:.2s}
+thead th.sorted .ar{opacity:1;color:var(--accent-soft)}
+tbody tr{transition:.2s var(--spring)}
+tbody tr:hover{background:rgba(255,255,255,.045)}
+tbody td{padding:11.5px 13px;border-top:1px solid rgba(255,255,255,.055);vertical-align:middle}
+tbody tr:first-child td{border-top-color:rgba(255,255,255,.09)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+td.str{font-weight:570}
+.row-act{display:flex;gap:5px;justify-content:flex-end;opacity:0;transition:.22s}
+tbody tr:hover .row-act{opacity:1}
+@media(hover:none){.row-act{opacity:1}}
+
+/* pills / badges */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3.5px 10px;border-radius:var(--r-full);
+  font-size:11.5px;font-weight:600;white-space:nowrap;letter-spacing:-.005em}
+.pill::before{content:'';width:5.5px;height:5.5px;border-radius:50%;background:currentColor;flex:none}
+.pill.g{background:rgba(50,215,75,.14);color:#6EE787}
+.pill.o{background:rgba(255,212,38,.14);color:#FFDF6B}
+.pill.r{background:rgba(255,69,58,.14);color:#FF8078}
+.pill.b{background:rgba(46,139,255,.16);color:#7FB8FF}
+.pill.v{background:rgba(167,139,250,.16);color:#C4B0FF}
+.pill.n{background:rgba(255,255,255,.08);color:var(--ink-3)}
+.pill.np::before{display:none}
+
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:var(--r-xs);
+  background:rgba(255,255,255,.07);border:1px solid var(--stroke);font-size:11.5px;font-weight:540;color:var(--ink-2)}
+
+/* avatar bubble in tables */
+.bub{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;flex:none;
+  font-size:11px;font-weight:680;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.26)}
+.cellflex{display:flex;align-items:center;gap:10px;min-width:0}
+.cellflex .t{min-width:0}
+.cellflex .t b{display:block;font-size:13px;font-weight:590;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cellflex .t span{display:block;font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ============================================================
+   FORMS
+   ============================================================ */
+.field{display:flex;flex-direction:column;gap:6.5px;min-width:0}
+.field > label{font-size:11.5px;font-weight:600;color:var(--ink-2);letter-spacing:.012em}
+.field .hint{font-size:11px;color:var(--ink-4);font-weight:480}
+.inp{
+  height:41px;padding:0 13px;border-radius:var(--r-sm);width:100%;
+  background:rgba(255,255,255,.055);border:1px solid var(--stroke);
+  font-size:13.5px;font-weight:500;transition:.22s var(--spring);
+}
+textarea.inp{height:auto;padding:11px 13px;resize:vertical;min-height:72px;line-height:1.5}
+select.inp{appearance:none;cursor:pointer;padding-right:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F2F6FFa8' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;background-size:14px}
+select.inp option{background:#0B1B33;color:var(--ink)}
+.inp:focus{outline:none;background:rgba(255,255,255,.1);border-color:rgba(46,139,255,.55);
+  box-shadow:0 0 0 4px rgba(46,139,255,.14)}
+.inp::placeholder{color:var(--ink-4)}
+.inp.err{border-color:rgba(255,69,58,.6);box-shadow:0 0 0 4px rgba(255,69,58,.12)}
+.inp[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.5;cursor:pointer}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+
+/* toggle */
+.sw{width:47px;height:28px;border-radius:var(--r-full);background:rgba(255,255,255,.13);
+  position:relative;flex:none;transition:.3s var(--spring);border:1px solid var(--stroke)}
+.sw::after{content:'';position:absolute;top:2.5px;left:2.5px;width:21px;height:21px;border-radius:50%;
+  background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:.3s var(--spring)}
+.sw.on{background:linear-gradient(140deg,var(--accent),var(--accent-deep));border-color:transparent;
+  box-shadow:0 3px 12px rgba(46,139,255,.42)}
+.sw.on::after{transform:translateX(19px)}
+.sw-row{display:flex;align-items:center;gap:13px;padding:13px 0;border-top:1px solid rgba(255,255,255,.06)}
+.sw-row:first-child{border-top:none}
+.sw-row .t{flex:1;min-width:0}
+.sw-row .t b{display:block;font-size:13.5px;font-weight:570}
+.sw-row .t span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:2px;line-height:1.45}
+
+/* ============================================================
+   SHEETS / MODALS
+   ============================================================ */
+.scrim{position:fixed;inset:0;z-index:200;background:rgba(3,7,15,.62);
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  display:flex;align-items:center;justify-content:center;padding:22px;
+  animation:fade .28s var(--spring)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{
+  width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;
+  border-radius:var(--r-xl);
+  background:linear-gradient(165deg,rgba(24,44,78,.94),rgba(9,20,38,.96));
+  backdrop-filter:blur(40px) saturate(200%);-webkit-backdrop-filter:blur(40px) saturate(200%);
+  border:1px solid var(--stroke-2);box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.16);
+  animation:sheetIn .46s var(--spring);overflow:hidden;
+}
+.sheet.wide{max-width:840px}
+.sheet.narrow{max-width:430px}
+@keyframes sheetIn{from{opacity:0;transform:translateY(34px) scale(.955)}to{opacity:1;transform:none}}
+.sheet-h{display:flex;align-items:center;gap:13px;padding:19px 22px;border-bottom:1px solid var(--stroke);flex:none}
+.sheet-h h2{font-size:17.5px;font-weight:650;letter-spacing:-.024em}
+.sheet-h p{font-size:12px;color:var(--ink-3);margin-top:2px}
+.sheet-h .spacer{flex:1}
+.sheet-b{padding:22px;overflow-y:auto;flex:1}
+.sheet-f{display:flex;gap:9px;padding:16px 22px;border-top:1px solid var(--stroke);flex:none;
+  background:rgba(0,0,0,.16)}
+.sheet-f .spacer{flex:1}
+
+/* line items builder */
+.lines{display:flex;flex-direction:column;gap:9px}
+.line{display:grid;grid-template-columns:1fr 78px 108px 88px 32px;gap:8px;align-items:center;
+  padding:10px;border-radius:var(--r-sm);background:rgba(255,255,255,.04);border:1px solid var(--stroke)}
+.line .inp{height:36px;font-size:12.5px}
+.line .tot{font-size:12.5px;font-weight:650;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent-soft)}
+.line-x{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(255,69,58,.14);color:#FF8078;transition:.2s}
+.line-x:hover{background:rgba(255,69,58,.26)}
+.line-x svg{width:14px;height:14px}
+.totals{margin-top:15px;padding:15px;border-radius:var(--r-md);
+  background:linear-gradient(150deg,rgba(46,139,255,.14),rgba(46,139,255,.05));
+  border:1px solid rgba(46,139,255,.24)}
+.trow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:13px;color:var(--ink-2)}
+.trow b{font-variant-numeric:tabular-nums;font-weight:620;color:var(--ink)}
+.trow.big{font-size:17px;font-weight:680;color:var(--ink);padding-top:11px;margin-top:6px;
+  border-top:1px solid rgba(255,255,255,.13)}
+.trow.big b{font-size:21px;letter-spacing:-.03em}
+.trow.mg b{color:#6EE787}
+
+/* toasts */
+.toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:400;
+  display:flex;flex-direction:column;gap:9px;align-items:center;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:var(--r-full);
+  background:rgba(16,32,58,.9);backdrop-filter:blur(30px) saturate(190%);
+  -webkit-backdrop-filter:blur(30px) saturate(190%);
+  border:1px solid var(--stroke-2);box-shadow:var(--shadow-lg);
+  font-size:13.5px;font-weight:560;animation:toastIn .44s var(--spring);max-width:min(420px,90vw)}
+@keyframes toastIn{from{opacity:0;transform:translateY(22px) scale(.92)}to{opacity:1;transform:none}}
+.toast.out{animation:toastOut .3s var(--snap) forwards}
+@keyframes toastOut{to{opacity:0;transform:translateY(12px) scale(.94)}}
+.toast svg{width:17px;height:17px;flex:none}
+.toast.ok svg{color:var(--success)} .toast.er svg{color:var(--danger)} .toast.in svg{color:var(--accent-soft)}
+
+/* empty state */
+.empty{text-align:center;padding:56px 22px}
+.empty-ico{width:62px;height:62px;margin:0 auto 17px;border-radius:20px;display:grid;place-items:center;
+  background:linear-gradient(150deg,rgba(255,255,255,.09),rgba(255,255,255,.03));
+  border:1px solid var(--stroke)}
+.empty-ico svg{width:27px;height:27px;color:var(--ink-3)}
+.empty h4{font-size:16px;font-weight:620;margin-bottom:6px}
+.empty p{font-size:13px;color:var(--ink-3);max-width:340px;margin:0 auto 18px;line-height:1.55}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+.chart{width:100%;overflow:visible}
+.bar{transition:.7s var(--spring);cursor:pointer}
+.bar:hover{filter:brightness(1.35)}
+.gline{stroke:rgba(255,255,255,.06);stroke-width:1}
+.glab{font-size:9.5px;fill:var(--ink-4);font-weight:560;font-family:var(--font)}
+.ring-bg{stroke:rgba(255,255,255,.09)}
+.ring-fg{transition:stroke-dashoffset 1.3s var(--spring);stroke-linecap:round}
+.donut-seg{transition:.35s var(--spring);cursor:pointer}
+.donut-seg:hover{filter:brightness(1.3);transform:scale(1.035);transform-origin:center}
+.legend{display:flex;flex-direction:column;gap:9px}
+.leg{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.leg .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.leg .nm{flex:1;color:var(--ink-2);font-weight:520;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leg .vl{font-weight:650;font-variant-numeric:tabular-nums;font-size:12.5px}
+
+/* progress bar */
+.pbar{height:7px;border-radius:var(--r-full);background:rgba(255,255,255,.09);overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:var(--r-full);transition:width .9s var(--spring);
+  background:linear-gradient(90deg,var(--accent),var(--accent-soft))}
+.pbar.g i{background:linear-gradient(90deg,#28B84A,#6EE787)}
+.pbar.o i{background:linear-gradient(90deg,#E0A400,#FFD426)}
+.pbar.r i{background:linear-gradient(90deg,#D9342B,#FF8078)}
+
+/* alert row */
+.alert{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r-sm);
+  background:rgba(255,212,38,.09);border:1px solid rgba(255,212,38,.22);margin-bottom:9px}
+.alert.r{background:rgba(255,69,58,.09);border-color:rgba(255,69,58,.24)}
+.alert.b{background:rgba(46,139,255,.09);border-color:rgba(46,139,255,.24)}
+.alert svg{width:17px;height:17px;flex:none;color:#FFDF6B}
+.alert.r svg{color:#FF8078} .alert.b svg{color:#7FB8FF}
+.alert .t{flex:1;min-width:0}
+.alert .t b{display:block;font-size:13px;font-weight:590}
+.alert .t span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+
+/* stock meter */
+.stock-item{display:flex;align-items:center;gap:13px;padding:13px 0;border-top:1px solid rgba(255,255,255,.055)}
+.stock-item:first-child{border-top:none;padding-top:0}
+.stock-item .t{flex:1;min-width:0}
+.stock-item .t b{font-size:13.5px;font-weight:580}
+.stock-item .t .m{display:flex;align-items:center;gap:9px;margin-top:7px}
+.stock-item .t .m .pbar{flex:1}
+.stock-item .qt{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em;min-width:44px;text-align:right}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+.auth{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:22px;overflow-y:auto}
+.auth-card{width:100%;max-width:404px;padding:34px 30px;border-radius:var(--r-xl);
+  background:linear-gradient(165deg,rgba(26,48,86,.82),rgba(9,20,38,.9));
+  backdrop-filter:blur(44px) saturate(200%);-webkit-backdrop-filter:blur(44px) saturate(200%);
+  border:1px solid var(--stroke-2);box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.18);
+  animation:sheetIn .6s var(--spring)}
+.auth-mark{width:56px;height:56px;border-radius:18px;margin:0 auto 20px;display:grid;place-items:center;
+  background:linear-gradient(150deg,var(--accent),var(--accent-deep));
+  box-shadow:0 12px 34px rgba(46,139,255,.46),inset 0 1px 0 rgba(255,255,255,.42)}
+.auth-mark svg{width:29px;height:29px}
+.auth-card h1{font-size:24px;font-weight:690;text-align:center;letter-spacing:-.032em}
+.auth-card .lede{font-size:13.5px;color:var(--ink-3);text-align:center;margin-top:7px;margin-bottom:24px;line-height:1.5}
+.auth-form{display:flex;flex-direction:column;gap:14px}
+.auth-swap{text-align:center;font-size:13px;color:var(--ink-3);margin-top:20px}
+.auth-swap button{color:var(--accent-soft);font-weight:620;font-size:13px}
+.auth-swap button:hover{text-decoration:underline}
+.auth-err{padding:11px 14px;border-radius:var(--r-sm);background:rgba(255,69,58,.13);
+  border:1px solid rgba(255,69,58,.3);font-size:12.5px;color:#FF8078;font-weight:530;line-height:1.45}
+.auth-note{margin-top:22px;padding:13px;border-radius:var(--r-sm);background:rgba(46,139,255,.09);
+  border:1px solid rgba(46,139,255,.2);font-size:11.5px;color:var(--ink-3);line-height:1.55}
+.auth-note b{color:var(--accent-soft);font-weight:640}
+
+/* ============================================================
+   MISC
+   ============================================================ */
+.sk{background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.11),rgba(255,255,255,.05));
+  background-size:200% 100%;animation:shim 1.5s linear infinite;border-radius:var(--r-sm)}
+@keyframes shim{to{background-position:-200% 0}}
+.boot{position:fixed;inset:0;z-index:500;display:grid;place-items:center;background:var(--navy-900)}
+.boot .sp{width:34px;height:34px;border-radius:50%;border:2.5px solid rgba(255,255,255,.12);
+  border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.divider{height:1px;background:var(--stroke);margin:18px 0}
+.mono{font-family:var(--mono);font-size:12px}
+.kbd{display:inline-block;padding:1.5px 6px;border-radius:6px;background:rgba(255,255,255,.09);
+  border:1px solid var(--stroke);font-size:10.5px;font-weight:620;font-family:var(--mono)}
+.filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters .inp{height:34px;width:auto;min-width:135px;font-size:12.5px}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:1180px){
+  .g4{grid-template-columns:repeat(2,1fr)}
+  .g-23{grid-template-columns:1fr}
+}
+@media(max-width:900px){
+  .rail{display:none}
+  .main{padding:18px 15px 108px}
+  .g3{grid-template-columns:1fr}
+  .g2{grid-template-columns:1fr}
+  .search-wrap{display:none}
+  .head h1{font-size:24px}
+  .form-grid{grid-template-columns:1fr}
+  .line{grid-template-columns:1fr 60px 1fr;grid-template-areas:"p p p" "q u t" "x x x";gap:7px}
+  .line > *:nth-child(1){grid-area:p} .line > *:nth-child(2){grid-area:q}
+  .line > *:nth-child(3){grid-area:u} .line > *:nth-child(4){grid-area:t}
+  .line > *:nth-child(5){grid-area:x;justify-self:end}
+  .sheet{max-width:none;max-height:92vh;border-radius:var(--r-xl) var(--r-xl) 0 0;align-self:flex-end}
+  .scrim{padding:0;align-items:flex-end}
+  .sheet-b{padding:18px}
+  .toasts{bottom:calc(86px + var(--safe-b))}
+  .tabbar{
+    display:flex;position:fixed;bottom:0;left:0;right:0;z-index:60;
+    padding:8px 8px calc(8px + var(--safe-b));gap:2px;
+    background:rgba(7,18,36,.84);backdrop-filter:blur(30px) saturate(190%);
+    -webkit-backdrop-filter:blur(30px) saturate(190%);
+    border-top:1px solid var(--stroke);
+  }
+  .tabb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3.5px;padding:7px 3px;
+    border-radius:var(--r-sm);font-size:9.5px;font-weight:580;color:var(--ink-3);transition:.24s var(--spring)}
+  .tabb svg{width:21px;height:21px}
+  .tabb.on{color:var(--accent-soft);background:rgba(46,139,255,.13)}
+  .tabb.on svg{transform:scale(1.06)}
+}
+@media(max-width:600px){
+  .g4{grid-template-columns:1fr}
+  .kpi-val{font-size:24px}
+  .topbar{padding:11px 15px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<g id="s" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></g>
+</defs>
+<symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="8.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2"/><rect x="13.5" y="11" width="7.5" height="10" rx="2"/><rect x="3" y="14" width="7.5" height="7" rx="2"/></symbol>
+<symbol id="i-sale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3h2.2l2.2 12.1a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 7H6"/><circle cx="9.5" cy="20.5" r="1.5"/><circle cx="18" cy="20.5" r="1.5"/></symbol>
+<symbol id="i-order" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.5 4.2"/><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol>
+<symbol id="i-client" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="i-stock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-charge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2.5-1.8L9 22l2.5-1.8L14 22l2.5-1.8L19 22V2l-2.5 1.8L14 2l-2.5 1.8L9 2 6.5 3.8 4 2z"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15.5V11M12 15.5V7M17 15.5v-3"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+<symbol id="i-admin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5.5l-8-3.2-8 3.2V12c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M18.4 2.6a2 2 0 0 1 2.8 2.8L12 14.6l-4 1 1-4 9.4-9z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-checkc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/><path d="M12 9v4.5M12 17.2h.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 16v-4.5M12 8h.01"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5.5 12.5 12 19l6.5-6.5"/></symbol>
+<symbol id="i-dl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5M12 15V3"/></symbol>
+<symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+<symbol id="i-nfc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8.5 15.5a5 5 0 0 1 0-7M11.5 13.5a1.8 1.8 0 0 1 0-3M15.5 8.5a5 5 0 0 1 0 7"/></symbol>
+<symbol id="i-euro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6.5A7.5 7.5 0 0 0 7.2 17.3 7.5 7.5 0 0 0 18 17.5"/><path d="M3.5 10.5h9M3.5 14h9"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 5.5-5.5 3.5 3.5L21 5"/><path d="M15 5h6v6"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10.5c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z"/><circle cx="12" cy="10.5" r="2.8"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 7 8.1 5.5a2 2 0 0 0 2.2 0L21.5 7"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 17v2.6a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.5-3 19.3 19.3 0 0 1-6-6 19.6 19.6 0 0 1-3-8.6 2 2 0 0 1 2-2.2H6.5a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L7.6 9.6a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.8 2z"/></symbol>
+<symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 6.8V12l3.4 2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.8 10.5V7a4.2 4.2 0 0 1 8.4 0v3.5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 14.2 9l6.5 2.2-6.5 2.2L12 20l-2.2-6.6L3.3 11.2 9.8 9 12 2.5z"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H3l7.2 8.5V19l3.6 2v-8.5L21 4z"/></symbol>
+</svg>
+
+<div class="ambient"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div><div class="grain"></div></div>
+
+<div class="boot" id="boot"><div class="sp"></div></div>
+
+<!-- ============ AUTH ============ -->
+<div class="auth hidden" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-mark"><svg viewBox="0 0 24 24"><use href="#i-nfc"/></svg></div>
+    <h1 id="authTitle">Content de vous revoir</h1>
+    <p class="lede" id="authLede">Connectez-vous pour reprendre le suivi de votre activité.</p>
+    <div class="auth-form">
+      <div class="auth-err hidden" id="authErr"></div>
+      <div class="field hidden" id="fName">
+        <label for="aName">Nom complet</label>
+        <input class="inp" id="aName" type="text" placeholder="Paul Remy" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="aMail">Adresse e-mail</label>
+        <input class="inp" id="aMail" type="email" placeholder="vous@exemple.fr" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="aPass">Mot de passe</label>
+        <input class="inp" id="aPass" type="password" placeholder="8 caractères minimum" autocomplete="current-password">
+      </div>
+      <button class="btn pri block" id="authGo" style="height:44px;margin-top:4px">Se connecter</button>
+    </div>
+    <p class="auth-swap" id="authSwap"></p>
+    <div class="auth-note">
+      <b>Démo</b> — les comptes sont stockés localement. À la mise en ligne, Supabase Auth prend le relais et gère le chiffrement des mots de passe.
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24"><use href="#i-nfc"/></svg></div>
+      <div class="brand-txt"><b>ScanAvis</b><span id="brandSub">Gestion d'activité</span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
+      <input class="search" id="globalSearch" placeholder="Rechercher un client, une vente…">
+    </div>
+    <button class="btn ico" id="btnBell" title="Alertes"><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg></button>
+    <div class="avatar" id="userChip" title="Mon compte"></div>
+  </header>
+
+  <div class="body">
+    <nav class="rail" id="rail"></nav>
+    <main class="main" id="main"></main>
+  </div>
+
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+/* CDN de secours si jsDelivr est bloqué ou indisponible */
+if (!window.supabase) document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>');
+</script>
+<script>
+/* ============================================================================
+   SCANAVIS — gestion d'achat/revente de cartes NFC d'avis Google
+   ----------------------------------------------------------------------------
+   Persistance : Supabase — Postgres, Auth et Row Level Security.
+   Toutes les écritures passent par l'objet API ; les vues lisent uniquement
+   S.db, rechargé depuis la base après chaque mutation.
+   ============================================================================ */
+
+/* ═══════════════ CONFIGURATION — les 3 seules lignes à renseigner ═══════════════ */
+const SUPABASE_URL  = 'https://nluzgsbiiojubpihgndu.supabase.co';   // sans /rest/v1
+const SUPABASE_KEY  = 'sb_publishable_-k8g-jHnx_t8oRghusA-Vg_jKrK07Un';   // clé publiable — sans danger dans le code
+const ADMIN_EMAIL   = 'paul.remy459@gmail.com';
+/* ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Affiche une panne au lieu de laisser tourner l'écran de chargement. */
+function panne(titre, detail) {
+  const b = document.getElementById('boot');
+  if (!b) return;
+  b.classList.remove('hidden');
+  b.innerHTML = `<div style="max-width:460px;text-align:center;padding:26px">
+    <div class="auth-mark" style="background:linear-gradient(150deg,#FF6B5B,#D9342B)">
+      <svg viewBox="0 0 24 24"><use href="#i-alert"/></svg></div>
+    <h1 style="font-size:20px;font-weight:680;margin-bottom:10px">${titre}</h1>
+    <p style="font-size:13.5px;color:var(--ink-3);line-height:1.6">${detail}</p></div>`;
+}
+window.addEventListener('error', e => panne('Une erreur est survenue',
+  'Détail technique : ' + (e.message || 'inconnu') + '. La console du navigateur en dira plus.'));
+
+/* Safari refuse le stockage local sur les pages ouvertes en file:// —
+   on bascule alors sur un stockage en mémoire, valable le temps de l'onglet. */
+const memoire = {};
+const stockageSession = {
+  getItem: k => { try { return window.localStorage.getItem(k); } catch (e) { return k in memoire ? memoire[k] : null; } },
+  setItem: (k, v) => { try { window.localStorage.setItem(k, v); } catch (e) { memoire[k] = v; } },
+  removeItem: k => { try { window.localStorage.removeItem(k); } catch (e) { delete memoire[k]; } }
+};
+
+let sb = null;
+if (!window.supabase) {
+  panne('Librairie Supabase inaccessible',
+    "Le script supabase-js n'a pas pu être téléchargé. Vérifiez votre connexion internet ou un éventuel bloqueur de contenu.");
+} else {
+  try {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { storage: stockageSession, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
+  } catch (e) {
+    panne('Connexion au projet impossible', 'Vérifiez SUPABASE_URL et SUPABASE_KEY. Détail : ' + e.message);
+  }
+}
+
+/* ---------- Utilitaires ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nEUR = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
+const nEUR0 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const eur = v => nEUR.format(Number(v) || 0);
+const eur0 = v => nEUR0.format(Number(v) || 0);
+const num = v => new Intl.NumberFormat('fr-FR').format(Number(v) || 0);
+const pct = v => (Number(v) || 0).toFixed(1).replace('.', ',') + ' %';
+const today = () => new Date().toISOString().slice(0, 10);
+const monthKey = d => String(d).slice(0, 7);
+const dfr = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const dshort = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '—';
+const MOIS = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+const initials = s => String(s || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = n => Math.round(n * 100) / 100;
+
+const HUES = ['#2E8BFF', '#A78BFA', '#32D74B', '#FFD426', '#FF8A5B', '#5AC8FA', '#FF6B9D', '#4ECDC4'];
+const hueFor = s => HUES[[...String(s || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % HUES.length];
+
+async function sha(txt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt + '::pnfc'));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function toast(msg, kind = 'ok') {
+  const ico = { ok: 'i-checkc', er: 'i-alert', in: 'i-info' }[kind] || 'i-info';
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<svg viewBox="0 0 24 24"><use href="#${ico}"/></svg><span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 3000);
+}
+
+/* ---------- État applicatif ---------- */
+const S = {
+  user: null,
+  db: null,
+  view: 'dash',
+  period: 'mois',
+  search: '',
+  sort: {},
+  filters: {},
+  allUsers: []
+};
+
+/* ============================================================================
+   AUTHENTIFICATION
+   ============================================================================ */
+let authMode = 'login';
+
+function paintAuth() {
+  const isLogin = authMode === 'login';
+  $('#authTitle').textContent = isLogin ? 'Content de vous revoir' : 'Créer votre compte';
+  $('#authLede').textContent = isLogin
+    ? 'Connectez-vous pour reprendre le suivi de votre activité.'
+    : 'Quelques secondes suffisent pour démarrer le suivi.';
+  $('#fName').classList.toggle('hidden', isLogin);
+  $('#authGo').textContent = isLogin ? 'Se connecter' : 'Créer mon compte';
+  $('#aPass').autocomplete = isLogin ? 'current-password' : 'new-password';
+  $('#authSwap').innerHTML = isLogin
+    ? `Pas encore de compte ? <button id="swapBtn">Créer un compte</button>`
+    : `Vous avez déjà un compte ? <button id="swapBtn">Se connecter</button>`;
+  $('#authErr').classList.add('hidden');
+  $('#swapBtn').onclick = () => { authMode = isLogin ? 'signup' : 'login'; paintAuth(); };
+}
+
+function authError(msg) {
+  const e = $('#authErr');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+async function submitAuth() {
+  const email = $('#aMail').value.trim().toLowerCase();
+  const pass = $('#aPass').value;
+  const name = $('#aName').value.trim();
+  const btn = $('#authGo');
+
+  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return authError("Cette adresse e-mail n'est pas valide.");
+  if (pass.length < 8) return authError('Le mot de passe doit faire au moins 8 caractères.');
+  if (authMode === 'signup' && name.length < 2) return authError('Indiquez votre nom complet.');
+
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Connexion…' : 'Création…';
+
+  try {
+    if (authMode === 'signup') {
+      const { data, error } = await sb.auth.signUp({
+        email, password: pass, options: { data: { nom: name } }
+      });
+      if (error) return authError(traduireErreur(error.message));
+      if (!data.session) {
+        authError("Compte créé. Ouvrez l'e-mail de confirmation puis revenez vous connecter.");
+        authMode = 'login';
+        return;
+      }
+      await openSession();
+      toast(`Bienvenue ${name.split(' ')[0]} — votre espace est prêt.`);
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) return authError(traduireErreur(error.message));
+      const ok = await openSession();
+      if (ok) toast(`Content de vous revoir, ${S.user.name.split(' ')[0]}.`);
+    }
+  } catch (err) {
+    console.error(err);
+    authError("La connexion a échoué. Vérifiez votre connexion internet et réessayez.");
+  } finally {
+    btn.disabled = false;
+    if (authMode === 'login') paintAuth();
+  }
+}
+
+function traduireErreur(m) {
+  const s = String(m).toLowerCase();
+  if (s.includes('invalid login')) return 'E-mail ou mot de passe incorrect.';
+  if (s.includes('already registered') || s.includes('already been registered')) return 'Un compte existe déjà avec cette adresse.';
+  if (s.includes('email not confirmed')) return "Confirmez d'abord votre adresse via l'e-mail reçu.";
+  if (s.includes('rate limit') || s.includes('too many')) return 'Trop de tentatives. Patientez une minute.';
+  if (s.includes('password')) return 'Mot de passe trop court ou trop simple.';
+  if (s.includes('failed to fetch')) return "Impossible de joindre le serveur. Vérifiez l'URL et la clé Supabase.";
+  return m;
+}
+
+/* ============================================================================
+   COUCHE D'ACCÈS AUX DONNÉES
+   Traduit entre le format Supabase (snake_case) et le format applicatif.
+   ============================================================================ */
+const toNum = v => Number(v) || 0;
+
+const Map = {
+  produit:  r => ({ id: r.id, nom: r.nom, ref: r.reference || '', coutRef: toNum(r.cout_ref), prixRef: toNum(r.prix_ref), seuil: r.seuil, actif: r.actif }),
+  client:   r => ({ id: r.id, nom: r.nom, contact: r.contact || '', ville: r.ville || '', tel: r.tel || '', email: r.email || '', secteur: r.secteur || '', statut: r.statut, notes: r.notes || '', createdAt: r.created_at }),
+  vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
+  commande: r => ({ id: r.id, fournisseur: r.fournisseur, date: r.date, statut: r.statut, frais: toNum(r.frais), notes: r.notes || '', dateReception: r.date_reception, createdAt: r.created_at, lignes: [] }),
+  charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date })
+};
+
+function boum(error) {
+  if (!error) return false;
+  console.error(error);
+  toast(error.message?.includes('row-level security')
+    ? "Enregistrement refusé : votre compte n'a pas les droits."
+    : 'Enregistrement impossible. Réessayez.', 'er');
+  return true;
+}
+
+const API = {
+  uid: () => S.user.id,
+
+  async chargerTout() {
+    const u = S.user.id;
+    const [prod, cli, ven, vli, cmd, cli2, chg, par] = await Promise.all([
+      sb.from('produits').select('*').eq('user_id', u).order('created_at'),
+      sb.from('clients').select('*').eq('user_id', u).order('created_at'),
+      sb.from('ventes').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('vente_lignes').select('*').eq('user_id', u),
+      sb.from('commandes').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('commande_lignes').select('*').eq('user_id', u),
+      sb.from('charges').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('parametres').select('*').eq('user_id', u).maybeSingle()
+    ]);
+    const err = [prod, cli, ven, vli, cmd, cli2, chg, par].find(r => r.error);
+    if (err) throw err.error;
+
+    const ventes = (ven.data || []).map(Map.vente);
+    const iv = Object.fromEntries(ventes.map(v => [v.id, v]));
+    for (const l of vli.data || []) iv[l.vente_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, prix: toNum(l.prix) });
+
+    const commandes = (cmd.data || []).map(Map.commande);
+    const ic = Object.fromEntries(commandes.map(c => [c.id, c]));
+    for (const l of cli2.data || []) ic[l.commande_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, cout: toNum(l.cout) });
+
+    const p = par.data || {};
+    return {
+      produits: (prod.data || []).map(Map.produit),
+      clients: (cli.data || []).map(Map.client),
+      ventes, commandes,
+      charges: (chg.data || []).map(Map.charge),
+      settings: {
+        objectif: toNum(p.objectif ?? 3000), devise: 'EUR',
+        alertesStock: p.alertes_stock ?? true,
+        assujettiTVA: p.assujetti_tva ?? false,
+        tvaTaux: toNum(p.tva_taux ?? 20)
+      }
+    };
+  },
+
+  async saveVente(rec) {
+    const u = this.uid();
+    const { data, error } = await sb.from('ventes').upsert({
+      id: rec.id, user_id: u, client_id: rec.clientId || null, date: rec.date,
+      moyen: rec.moyen, statut: rec.statut, remise: rec.remise, notes: rec.notes
+    }).select().single();
+    if (boum(error)) return null;
+    await sb.from('vente_lignes').delete().eq('vente_id', data.id);
+    if (rec.lignes.length) {
+      const { error: e2 } = await sb.from('vente_lignes').insert(
+        rec.lignes.map(l => ({ vente_id: data.id, user_id: u, produit_id: l.produitId, qte: l.qte, prix: l.prix })));
+      if (boum(e2)) return null;
+    }
+    return data.id;
+  },
+
+  async patchVente(id, champs) {
+    const { error } = await sb.from('ventes').update(champs).eq('id', id);
+    return !boum(error);
+  },
+
+  async saveCommande(rec) {
+    const u = this.uid();
+    const { data, error } = await sb.from('commandes').upsert({
+      id: rec.id, user_id: u, fournisseur: rec.fournisseur, date: rec.date,
+      statut: rec.statut, frais: rec.frais, notes: rec.notes,
+      date_reception: rec.dateReception || null
+    }).select().single();
+    if (boum(error)) return null;
+    await sb.from('commande_lignes').delete().eq('commande_id', data.id);
+    if (rec.lignes.length) {
+      const { error: e2 } = await sb.from('commande_lignes').insert(
+        rec.lignes.map(l => ({ commande_id: data.id, user_id: u, produit_id: l.produitId, qte: l.qte, cout: l.cout })));
+      if (boum(e2)) return null;
+    }
+    return data.id;
+  },
+
+  async patchCommande(id, champs) {
+    const { error } = await sb.from('commandes').update(champs).eq('id', id);
+    return !boum(error);
+  },
+
+  async saveClient(rec) {
+    const { data, error } = await sb.from('clients').upsert({
+      id: rec.id, user_id: this.uid(), nom: rec.nom, contact: rec.contact, ville: rec.ville,
+      tel: rec.tel, email: rec.email, secteur: rec.secteur, statut: rec.statut, notes: rec.notes
+    }).select().single();
+    return boum(error) ? null : data.id;
+  },
+
+  async saveProduit(rec) {
+    const { data, error } = await sb.from('produits').upsert({
+      id: rec.id, user_id: this.uid(), nom: rec.nom, reference: rec.ref,
+      cout_ref: rec.coutRef, prix_ref: rec.prixRef, seuil: rec.seuil, actif: rec.actif
+    }).select().single();
+    return boum(error) ? null : data.id;
+  },
+
+  async saveCharge(rec) {
+    const { data, error } = await sb.from('charges').upsert({
+      id: rec.id, user_id: this.uid(), libelle: rec.libelle,
+      categorie: rec.categorie, montant: rec.montant, date: rec.date
+    }).select().single();
+    return boum(error) ? null : data.id;
+  },
+
+  async saveParametres(s) {
+    const { error } = await sb.from('parametres').upsert({
+      user_id: this.uid(), objectif: s.objectif, alertes_stock: s.alertesStock,
+      assujetti_tva: s.assujettiTVA, tva_taux: s.tvaTaux
+    });
+    return !boum(error);
+  },
+
+  async supprimer(table, id) {
+    const { error } = await sb.from(table).delete().eq('id', id);
+    return !boum(error);
+  },
+
+  async reinitialiser() {
+    const { error } = await sb.rpc('reinitialiser_mes_donnees');
+    return !boum(error);
+  },
+
+  async statsAdmin() {
+    const { data, error } = await sb.rpc('admin_statistiques');
+    if (boum(error)) return [];
+    return data || [];
+  }
+};
+
+/* Recharge la base depuis Supabase puis rafraîchit l'écran courant. */
+async function recharger(silencieux) {
+  try {
+    S.db = await API.chargerTout();
+    if (!silencieux) { buildNav(); render(); }
+  } catch (e) {
+    console.error(e);
+    toast('Impossible de recharger les données.', 'er');
+  }
+}
+
+async function openSession() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return false;
+
+  let { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (!prof) {
+    await new Promise(r => setTimeout(r, 700));
+    ({ data: prof } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle());
+  }
+  if (prof && prof.actif === false) {
+    await sb.auth.signOut();
+    authError("Ce compte a été désactivé par l'administrateur.");
+    return false;
+  }
+
+  S.user = {
+    id: user.id,
+    email: user.email,
+    name: prof?.nom || user.user_metadata?.nom || user.email.split('@')[0],
+    createdAt: prof?.created_at || user.created_at,
+    isAdmin: user.email === ADMIN_EMAIL
+  };
+
+  try {
+    S.db = await API.chargerTout();
+  } catch (e) {
+    console.error(e);
+    authError("Les tables sont introuvables. Avez-vous exécuté schema.sql dans Supabase ?");
+    await sb.auth.signOut();
+    return false;
+  }
+
+  $('#authScreen').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  $('#userChip').textContent = initials(S.user.name);
+  $('#userChip').classList.toggle('adm', S.user.isAdmin);
+  $('#brandSub').textContent = S.user.isAdmin ? 'Administrateur' : "Gestion d'activité";
+  buildNav();
+  go('dash');
+  return true;
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  S.user = null; S.db = null;
+  $('#app').classList.add('hidden');
+  $('#authScreen').classList.remove('hidden');
+  $('#aPass').value = ''; $('#aMail').value = ''; $('#aName').value = '';
+  authMode = 'login'; paintAuth();
+}
+
+/* ============================================================================
+   MOTEUR DE CALCUL
+   ============================================================================ */
+const Calc = {
+  /* Prix moyen pondéré d'achat, frais de port répartis au prorata de la valeur */
+  pmp(produitId) {
+    let qte = 0, valeur = 0;
+    for (const c of S.db.commandes) {
+      if (c.statut !== 'recue') continue;
+      const brut = c.lignes.reduce((s, l) => s + l.qte * l.cout, 0) || 1;
+      const ratio = 1 + (Number(c.frais) || 0) / brut;
+      for (const l of c.lignes) {
+        if (l.produitId !== produitId) continue;
+        qte += l.qte;
+        valeur += l.qte * l.cout * ratio;
+      }
+    }
+    if (!qte) {
+      const p = S.db.produits.find(x => x.id === produitId);
+      return p ? Number(p.coutRef) || 0 : 0;
+    }
+    return valeur / qte;
+  },
+  entre(produitId) {
+    return S.db.commandes.filter(c => c.statut === 'recue')
+      .reduce((s, c) => s + c.lignes.filter(l => l.produitId === produitId).reduce((a, l) => a + l.qte, 0), 0);
+  },
+  sorti(produitId) {
+    return S.db.ventes.filter(v => v.statut !== 'annulee')
+      .reduce((s, v) => s + v.lignes.filter(l => l.produitId === produitId).reduce((a, l) => a + l.qte, 0), 0);
+  },
+  stock(produitId) { return this.entre(produitId) - this.sorti(produitId); },
+  enCommande(produitId) {
+    return S.db.commandes.filter(c => c.statut !== 'recue' && c.statut !== 'annulee')
+      .reduce((s, c) => s + c.lignes.filter(l => l.produitId === produitId).reduce((a, l) => a + l.qte, 0), 0);
+  },
+  valeurStock() {
+    return S.db.produits.reduce((s, p) => s + Math.max(0, this.stock(p.id)) * this.pmp(p.id), 0);
+  },
+  totalVente(v) {
+    const brut = v.lignes.reduce((s, l) => s + l.qte * l.prix, 0);
+    return rnd(brut - (Number(v.remise) || 0));
+  },
+  coutVente(v) {
+    return rnd(v.lignes.reduce((s, l) => s + l.qte * this.pmp(l.produitId), 0));
+  },
+  margeVente(v) { return rnd(this.totalVente(v) - this.coutVente(v)); },
+  totalCommande(c) {
+    return rnd(c.lignes.reduce((s, l) => s + l.qte * l.cout, 0) + (Number(c.frais) || 0));
+  },
+  /* Ventes sur une plage de dates (bornes incluses) */
+  ventesEntre(d1, d2) {
+    return S.db.ventes.filter(v => v.statut !== 'annulee' && v.date >= d1 && v.date <= d2);
+  },
+  caEntre(d1, d2) { return this.ventesEntre(d1, d2).reduce((s, v) => s + this.totalVente(v), 0); },
+  margeEntre(d1, d2) { return this.ventesEntre(d1, d2).reduce((s, v) => s + this.margeVente(v), 0); },
+  chargesEntre(d1, d2) {
+    return S.db.charges.filter(c => c.date >= d1 && c.date <= d2).reduce((s, c) => s + (Number(c.montant) || 0), 0);
+  },
+  impayes() {
+    return S.db.ventes.filter(v => v.statut === 'attente').reduce((s, v) => s + this.totalVente(v), 0);
+  },
+  caClient(clientId) {
+    return S.db.ventes.filter(v => v.clientId === clientId && v.statut !== 'annulee')
+      .reduce((s, v) => s + this.totalVente(v), 0);
+  },
+  /* 12 derniers mois : [{key,label,ca,marge}] */
+  serie12() {
+    const out = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const vs = S.db.ventes.filter(v => v.statut !== 'annulee' && monthKey(v.date) === key);
+      out.push({
+        key,
+        label: MOIS[d.getMonth()],
+        annee: d.getFullYear(),
+        ca: vs.reduce((s, v) => s + this.totalVente(v), 0),
+        marge: vs.reduce((s, v) => s + this.margeVente(v), 0),
+        nb: vs.length
+      });
+    }
+    return out;
+  },
+  bornes(periode) {
+    const n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    const iso = d => d.toISOString().slice(0, 10);
+    if (periode === 'mois') return [iso(new Date(y, m, 1)), iso(new Date(y, m + 1, 0))];
+    if (periode === 'moisPrec') return [iso(new Date(y, m - 1, 1)), iso(new Date(y, m, 0))];
+    if (periode === 'trim') { const q = Math.floor(m / 3) * 3; return [iso(new Date(y, q, 1)), iso(new Date(y, q + 3, 0))]; }
+    if (periode === 'annee') return [`${y}-01-01`, `${y}-12-31`];
+    return ['1900-01-01', '2999-12-31'];
+  },
+  alertes() {
+    const out = [];
+    for (const p of S.db.produits.filter(x => x.actif !== false)) {
+      const st = this.stock(p.id), seuil = Number(p.seuil) || 0;
+      if (st <= 0) out.push({ n: 'r', t: `${p.nom} — rupture de stock`, s: `Aucune unité disponible. ${this.enCommande(p.id) ? this.enCommande(p.id) + ' en commande.' : 'Passez une commande fournisseur.'}`, go: 'stock' });
+      else if (seuil && st <= seuil) out.push({ n: 'o', t: `${p.nom} — stock bas`, s: `${st} unité${st > 1 ? 's' : ''} restante${st > 1 ? 's' : ''}, seuil fixé à ${seuil}.`, go: 'stock' });
+    }
+    const imp = S.db.ventes.filter(v => v.statut === 'attente');
+    if (imp.length) out.push({ n: 'o', t: `${imp.length} vente${imp.length > 1 ? 's' : ''} en attente de paiement`, s: `${eur(this.impayes())} à encaisser.`, go: 'ventes' });
+    const transit = S.db.commandes.filter(c => c.statut === 'transit' || c.statut === 'commandee');
+    if (transit.length) out.push({ n: 'b', t: `${transit.length} commande${transit.length > 1 ? 's' : ''} en cours`, s: 'À réceptionner pour mettre le stock à jour.', go: 'commandes' });
+    return out;
+  }
+};
+
+/* ============================================================================
+   NAVIGATION
+   ============================================================================ */
+const NAV = [
+  { g: 'Pilotage', items: [
+    { id: 'dash', l: 'Tableau de bord', i: 'i-dash' },
+    { id: 'rapports', l: 'Rapports', i: 'i-chart' }
+  ]},
+  { g: 'Activité', items: [
+    { id: 'ventes', l: 'Ventes', i: 'i-sale' },
+    { id: 'commandes', l: 'Commandes', i: 'i-order' },
+    { id: 'charges', l: 'Charges', i: 'i-charge' }
+  ]},
+  { g: 'Référentiel', items: [
+    { id: 'stock', l: 'Stock', i: 'i-stock' },
+    { id: 'catalogue', l: 'Catalogue', i: 'i-tag' },
+    { id: 'clients', l: 'Clients', i: 'i-client' }
+  ]},
+  { g: 'Compte', items: [
+    { id: 'params', l: 'Réglages', i: 'i-set' },
+    { id: 'admin', l: 'Administration', i: 'i-admin', adminOnly: true }
+  ]}
+];
+const TABS = ['dash', 'ventes', 'commandes', 'stock', 'clients'];
+
+function buildNav() {
+  const alertN = Calc.alertes().filter(a => a.n === 'r' || a.n === 'o').length;
+  $('#rail').innerHTML = NAV.map(sec => {
+    const items = sec.items.filter(it => !it.adminOnly || S.user.isAdmin);
+    if (!items.length) return '';
+    return `<div class="rail-lbl">${sec.g}</div>` + items.map(it => `
+      <button class="navb ${it.adminOnly ? 'adm' : ''} ${S.view === it.id ? 'on' : ''}" data-go="${it.id}">
+        <svg viewBox="0 0 24 24"><use href="#${it.i}"/></svg>
+        <span>${it.l}</span>
+        ${it.id === 'stock' && alertN ? `<span class="pip">${alertN}</span>` : ''}
+      </button>`).join('');
+  }).join('');
+
+  $('#tabbar').innerHTML = TABS.map(id => {
+    const it = NAV.flatMap(s => s.items).find(x => x.id === id);
+    return `<button class="tabb ${S.view === id ? 'on' : ''}" data-go="${id}">
+      <svg viewBox="0 0 24 24"><use href="#${it.i}"/></svg><span>${it.l.split(' ')[0]}</span></button>`;
+  }).join('');
+
+  $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+}
+
+function go(view) {
+  S.view = view;
+  S.search = '';
+  buildNav();
+  render();
+  $('#main').scrollTop = 0;
+}
+
+function render() {
+  const R = {
+    dash: viewDash, ventes: viewVentes, commandes: viewCommandes, stock: viewStock,
+    clients: viewClients, catalogue: viewCatalogue, charges: viewCharges,
+    rapports: viewRapports, params: viewParams, admin: viewAdmin
+  }[S.view] || viewDash;
+  $('#main').innerHTML = `<div class="view">${R()}</div>`;
+  wire();
+}
+
+/* ============================================================================
+   GRAPHIQUES (SVG maison, aucune dépendance)
+   ============================================================================ */
+function chartBars(serie, opts = {}) {
+  const W = 760, H = 220, PL = 46, PR = 10, PT = 14, PB = 26;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const max = Math.max(...serie.map(d => d.ca), 10);
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const top = Math.ceil(max / step) * step || 10;
+  const bw = iw / serie.length;
+  const gw = Math.min(30, bw * 0.5);
+
+  let grid = '', bars = '', labs = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = PT + ih - (ih * i / 4);
+    grid += `<line class="gline" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/>
+             <text class="glab" x="${PL - 8}" y="${y + 3.5}" text-anchor="end">${eur0(top * i / 4)}</text>`;
+  }
+  serie.forEach((d, i) => {
+    const h = top ? (d.ca / top) * ih : 0;
+    const x = PL + i * bw + (bw - gw) / 2;
+    const y = PT + ih - h;
+    const mh = top ? (d.marge / top) * ih : 0;
+    bars += `<rect class="bar" x="${x}" y="${y}" width="${gw}" height="${Math.max(h, d.ca > 0 ? 2.5 : 0)}" rx="5"
+              fill="url(#gCA)"><title>${d.label} ${d.annee} — CA ${eur(d.ca)} · marge ${eur(d.marge)} · ${d.nb} vente(s)</title></rect>`;
+    if (d.marge > 0) bars += `<rect class="bar" x="${x}" y="${PT + ih - mh}" width="${gw}" height="${Math.max(mh, 2)}" rx="5" fill="url(#gMG)" opacity=".92" pointer-events="none"/>`;
+    labs += `<text class="glab" x="${x + gw / 2}" y="${H - 8}" text-anchor="middle">${d.label}</text>`;
+  });
+
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <linearGradient id="gCA" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5AC8FA"/><stop offset="100%" stop-color="#2E8BFF" stop-opacity=".55"/></linearGradient>
+      <linearGradient id="gMG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6EE787"/><stop offset="100%" stop-color="#28B84A"/></linearGradient>
+    </defs>${grid}${bars}${labs}</svg>`;
+}
+
+function chartRing(ratio, centerTop, centerSub) {
+  const r = 62, c = 2 * Math.PI * r, off = c * (1 - clamp(ratio, 0, 1));
+  const col = ratio >= 1 ? '#32D74B' : ratio >= .6 ? '#2E8BFF' : ratio >= .3 ? '#FFD426' : '#FF6B5B';
+  return `<svg class="chart" viewBox="0 0 160 160" style="max-width:172px;margin:0 auto;display:block">
+    <circle class="ring-bg" cx="80" cy="80" r="${r}" fill="none" stroke-width="13"/>
+    <circle class="ring-fg" cx="80" cy="80" r="${r}" fill="none" stroke="${col}" stroke-width="13"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 80 80)"/>
+    <text x="80" y="76" text-anchor="middle" fill="#F2F6FF" font-size="27" font-weight="700"
+      font-family="var(--font)" letter-spacing="-1">${centerTop}</text>
+    <text x="80" y="97" text-anchor="middle" fill="rgba(242,246,255,.5)" font-size="11.5"
+      font-weight="560" font-family="var(--font)">${centerSub}</text></svg>`;
+}
+
+function chartDonut(items) {
+  const tot = items.reduce((s, i) => s + i.v, 0);
+  if (!tot) return `<div style="height:150px;display:grid;place-items:center;color:var(--ink-4);font-size:12.5px">Aucune donnée sur la période</div>`;
+  const r = 56, sw = 22, c = 2 * Math.PI * r;
+  let acc = 0;
+  const segs = items.map(it => {
+    const frac = it.v / tot;
+    const s = `<circle class="donut-seg" cx="80" cy="80" r="${r}" fill="none" stroke="${it.c}" stroke-width="${sw}"
+      stroke-dasharray="${c * frac - 2.5} ${c}" stroke-dashoffset="${-c * acc}" transform="rotate(-90 80 80)"
+      stroke-linecap="round"><title>${esc(it.n)} — ${eur(it.v)} (${pct(frac * 100)})</title></circle>`;
+    acc += frac; return s;
+  }).join('');
+  return `<svg class="chart" viewBox="0 0 160 160" style="max-width:168px;margin:0 auto;display:block">${segs}
+    <text x="80" y="76" text-anchor="middle" fill="#F2F6FF" font-size="19" font-weight="700"
+      font-family="var(--font)" letter-spacing="-.6">${eur0(tot)}</text>
+    <text x="80" y="94" text-anchor="middle" fill="rgba(242,246,255,.5)" font-size="10.5"
+      font-weight="560" font-family="var(--font)">total</text></svg>`;
+}
+
+const kpiCard = (lbl, val, ico, col, foot) => `
+  <div class="glass kpi">
+    <div class="kpi-top">
+      <div class="kpi-ico" style="background:linear-gradient(150deg,${col}38,${col}18);color:${col}">
+        <svg viewBox="0 0 24 24"><use href="#${ico}"/></svg></div>
+      <div style="flex:1;min-width:0"><div class="kpi-lbl">${lbl}</div></div>
+    </div>
+    <div class="kpi-val">${val}</div>
+    <div class="kpi-foot">${foot || ''}</div>
+  </div>`;
+
+function trendBadge(cur, prev) {
+  if (!prev) return cur > 0 ? `<span class="trend fl">nouveau</span>` : `<span class="trend fl">—</span>`;
+  const d = ((cur - prev) / Math.abs(prev)) * 100;
+  const k = d > 1 ? 'up' : d < -1 ? 'dn' : 'fl';
+  const ic = d > 1 ? 'i-up' : d < -1 ? 'i-down' : '';
+  return `<span class="trend ${k}">${ic ? `<svg viewBox="0 0 24 24"><use href="#${ic}"/></svg>` : ''}${Math.abs(d).toFixed(0)} %</span>`;
+}
+
+const emptyState = (ico, titre, txt, btn) => `
+  <div class="empty">
+    <div class="empty-ico"><svg viewBox="0 0 24 24"><use href="#${ico}"/></svg></div>
+    <h4>${titre}</h4><p>${txt}</p>${btn || ''}
+  </div>`;
+
+/* ============================================================================
+   VUE — TABLEAU DE BORD
+   ============================================================================ */
+function viewDash() {
+  const [d1, d2] = Calc.bornes(S.period);
+  const prevMap = { mois: 'moisPrec', trim: null, annee: null, tout: null };
+  let pca = 0, pmg = 0, pnb = 0;
+  if (S.period === 'mois') { const [p1, p2] = Calc.bornes('moisPrec'); pca = Calc.caEntre(p1, p2); pmg = Calc.margeEntre(p1, p2); pnb = Calc.ventesEntre(p1, p2).length; }
+
+  const vs = Calc.ventesEntre(d1, d2);
+  const ca = Calc.caEntre(d1, d2);
+  const mg = Calc.margeEntre(d1, d2);
+  const ch = Calc.chargesEntre(d1, d2);
+  const net = mg - ch;
+  const panier = vs.length ? ca / vs.length : 0;
+  const tauxMarge = ca ? (mg / ca) * 100 : 0;
+  const obj = Number(S.db.settings.objectif) || 0;
+  const ratio = obj ? ca / obj : 0;
+  const serie = Calc.serie12();
+  const alertes = Calc.alertes();
+
+  /* répartition du CA par produit sur la période */
+  const parProduit = S.db.produits.map((p, i) => ({
+    n: p.nom, c: HUES[i % HUES.length],
+    v: vs.reduce((s, v) => s + v.lignes.filter(l => l.produitId === p.id).reduce((a, l) => a + l.qte * l.prix, 0), 0)
+  })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+
+  const topClients = S.db.clients.map(c => ({ c, ca: vs.filter(v => v.clientId === c.id).reduce((s, v) => s + Calc.totalVente(v), 0) }))
+    .filter(x => x.ca > 0).sort((a, b) => b.ca - a.ca).slice(0, 5);
+
+  const dernieres = [...S.db.ventes].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)).slice(0, 6);
+
+  const periodLbl = { mois: 'ce mois-ci', trim: 'ce trimestre', annee: 'cette année', tout: 'depuis le début' }[S.period];
+
+  return `
+  <div class="head">
+    <div>
+      <h1>Bonjour ${esc(S.user.name.split(' ')[0])}</h1>
+      <p>Voici où en est votre activité ${periodLbl}.</p>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="periodSeg">
+      ${[['mois', 'Mois'], ['trim', 'Trimestre'], ['annee', 'Année'], ['tout', 'Tout']]
+        .map(([k, l]) => `<button data-p="${k}" class="${S.period === k ? 'on' : ''}">${l}</button>`).join('')}
+    </div>
+    <button class="btn pri" data-act="newVente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle vente</button>
+  </div>
+
+  ${alertes.length ? `<div style="margin-bottom:18px">${alertes.slice(0, 3).map(a => `
+    <div class="alert ${a.n}" data-go="${a.go}" style="cursor:pointer">
+      <svg viewBox="0 0 24 24"><use href="#${a.n === 'b' ? 'i-info' : 'i-alert'}"/></svg>
+      <div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>
+    </div>`).join('')}</div>` : ''}
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard("Chiffre d'affaires", eur(ca), 'i-euro', '#2E8BFF',
+      `${S.period === 'mois' ? trendBadge(ca, pca) + '<span>vs mois dernier</span>' : `<span>${vs.length} vente${vs.length > 1 ? 's' : ''} encaissée${vs.length > 1 ? 's' : ''}</span>`}`)}
+    ${kpiCard('Marge brute', eur(mg), 'i-trend', '#32D74B',
+      `<span class="trend ${tauxMarge >= 50 ? 'up' : tauxMarge >= 30 ? 'fl' : 'dn'}">${pct(tauxMarge)}</span><span>du CA</span>`)}
+    ${kpiCard('Résultat net', eur(net), 'i-spark', net >= 0 ? '#A78BFA' : '#FF453A',
+      `<span>marge — ${eur(ch)} de charges</span>`)}
+    ${kpiCard('Panier moyen', eur(panier), 'i-card', '#FFD426',
+      `<span>${vs.length ? 'sur ' + vs.length + ' vente' + (vs.length > 1 ? 's' : '') : 'aucune vente'}</span>`)}
+  </div>
+
+  <div class="grid g-23" style="margin-bottom:15px">
+    <div class="glass card">
+      <div class="card-h">
+        <div><h3>Évolution sur 12 mois</h3><div class="sub">Chiffre d'affaires et marge par mois</div></div>
+        <div class="spacer"></div>
+        <span class="chip"><span style="width:8px;height:8px;border-radius:2px;background:#2E8BFF;display:inline-block"></span>CA</span>
+        <span class="chip"><span style="width:8px;height:8px;border-radius:2px;background:#32D74B;display:inline-block"></span>Marge</span>
+      </div>
+      ${chartBars(serie)}
+    </div>
+    <div class="glass card">
+      <div class="card-h"><div><h3>Objectif du mois</h3><div class="sub">${eur0(obj)} visés</div></div></div>
+      ${chartRing(ratio, pct(ratio * 100).replace(' %', '%'), eur0(Calc.caEntre(...Calc.bornes('mois'))))}
+      <div class="pbar ${ratio >= 1 ? 'g' : ratio >= .5 ? '' : 'o'}" style="margin-top:16px"><i style="width:${clamp(ratio, 0, 1) * 100}%"></i></div>
+      <div style="display:flex;justify-content:space-between;margin-top:9px;font-size:12px;color:var(--ink-3)">
+        <span>${ratio >= 1 ? 'Objectif atteint' : `Reste ${eur(Math.max(0, obj - Calc.caEntre(...Calc.bornes('mois'))))}`}</span>
+        <button class="btn gho sm" data-act="editObj">Modifier</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g-23">
+    <div class="glass card">
+      <div class="card-h"><div><h3>Dernières ventes</h3></div><div class="spacer"></div>
+        <button class="btn sm" data-go="ventes">Tout voir</button></div>
+      ${dernieres.length ? `<div class="tbl-scroll"><table>
+        <thead><tr><th class="nos">Client</th><th class="nos">Date</th><th class="nos">Statut</th><th class="nos num">Marge</th><th class="nos num">Total</th></tr></thead>
+        <tbody>${dernieres.map(v => {
+          const cl = S.db.clients.find(c => c.id === v.clientId);
+          const nm = cl ? cl.nom : 'Client de passage';
+          return `<tr data-open="vente:${v.id}" style="cursor:pointer">
+            <td><div class="cellflex"><div class="bub" style="background:${hueFor(nm)}">${initials(nm)}</div>
+              <div class="t"><b>${esc(nm)}</b><span>${v.lignes.reduce((s, l) => s + l.qte, 0)} article(s)</span></div></div></td>
+            <td style="color:var(--ink-3)">${dshort(v.date)}</td>
+            <td>${statutVentePill(v.statut)}</td>
+            <td class="num" style="color:#6EE787;font-weight:620">${eur(Calc.margeVente(v))}</td>
+            <td class="num str">${eur(Calc.totalVente(v))}</td></tr>`;
+        }).join('')}</tbody></table></div>`
+        : emptyState('i-sale', 'Aucune vente pour le moment', 'Enregistrez votre première vente pour voir vos indicateurs se remplir.', `<button class="btn pri" data-act="newVente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Enregistrer une vente</button>`)}
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:15px">
+      <div class="glass card">
+        <div class="card-h"><div><h3>Répartition par produit</h3></div></div>
+        ${chartDonut(parProduit)}
+        ${parProduit.length ? `<div class="legend" style="margin-top:15px">${parProduit.slice(0, 5).map(p => `
+          <div class="leg"><span class="dot" style="background:${p.c}"></span>
+            <span class="nm">${esc(p.n)}</span><span class="vl">${eur0(p.v)}</span></div>`).join('')}</div>` : ''}
+      </div>
+      <div class="glass card">
+        <div class="card-h"><div><h3>Meilleurs clients</h3></div></div>
+        ${topClients.length ? topClients.map(({ c, ca: cca }) => `
+          <div class="stock-item" data-open="client:${c.id}" style="cursor:pointer">
+            <div class="bub" style="background:${hueFor(c.nom)}">${initials(c.nom)}</div>
+            <div class="t"><b>${esc(c.nom)}</b>
+              <div class="m"><div class="pbar"><i style="width:${(cca / topClients[0].ca) * 100}%"></i></div></div></div>
+            <div class="qt" style="font-size:14px">${eur0(cca)}</div>
+          </div>`).join('')
+          : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Pas encore de client sur la période</div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function statutVentePill(s) {
+  return { payee: '<span class="pill g">Payée</span>', attente: '<span class="pill o">En attente</span>', annulee: '<span class="pill n">Annulée</span>' }[s] || '<span class="pill n">—</span>';
+}
+function statutCmdPill(s) {
+  return { recue: '<span class="pill g">Reçue</span>', transit: '<span class="pill b">En transit</span>', commandee: '<span class="pill o">Commandée</span>', annulee: '<span class="pill n">Annulée</span>' }[s] || '<span class="pill n">—</span>';
+}
+
+/* ---------- Tri de tableau générique ---------- */
+function sortState(view) { return S.sort[view] || (S.sort[view] = { key: 'date', dir: -1 }); }
+function applySort(rows, view, getters) {
+  const st = sortState(view);
+  const g = getters[st.key];
+  if (!g) return rows;
+  return [...rows].sort((a, b) => {
+    const x = g(a), y = g(b);
+    const r = typeof x === 'string' ? x.localeCompare(y, 'fr') : (x - y);
+    return r * st.dir;
+  });
+}
+function th(view, key, label, cls = '') {
+  const st = sortState(view);
+  const on = st.key === key;
+  return `<th class="${cls} ${on ? 'sorted' : ''}" data-sort="${view}:${key}">${label}<span class="ar">${on && st.dir === 1 ? '▲' : '▼'}</span></th>`;
+}
+const clientName = id => { const c = S.db.clients.find(x => x.id === id); return c ? c.nom : 'Client de passage'; };
+const produitName = id => { const p = S.db.produits.find(x => x.id === id); return p ? p.nom : 'Produit supprimé'; };
+
+/* ============================================================================
+   VUE — VENTES
+   ============================================================================ */
+function viewVentes() {
+  const f = S.filters.ventes || (S.filters.ventes = { statut: '', client: '', du: '', au: '' });
+  let rows = S.db.ventes.filter(v => {
+    if (f.statut && v.statut !== f.statut) return false;
+    if (f.client && v.clientId !== f.client) return false;
+    if (f.du && v.date < f.du) return false;
+    if (f.au && v.date > f.au) return false;
+    if (S.search) {
+      const hay = (clientName(v.clientId) + ' ' + (v.notes || '') + ' ' + v.lignes.map(l => produitName(l.produitId)).join(' ')).toLowerCase();
+      if (!hay.includes(S.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+  rows = applySort(rows, 'ventes', {
+    date: v => v.date, client: v => clientName(v.clientId), total: v => Calc.totalVente(v),
+    marge: v => Calc.margeVente(v), statut: v => v.statut
+  });
+
+  const ca = rows.filter(v => v.statut !== 'annulee').reduce((s, v) => s + Calc.totalVente(v), 0);
+  const mg = rows.filter(v => v.statut !== 'annulee').reduce((s, v) => s + Calc.margeVente(v), 0);
+  const att = rows.filter(v => v.statut === 'attente').reduce((s, v) => s + Calc.totalVente(v), 0);
+
+  return `
+  <div class="head">
+    <div><h1>Ventes</h1><p>${rows.length} vente${rows.length > 1 ? 's' : ''} affichée${rows.length > 1 ? 's' : ''} · ${eur(ca)} de chiffre d'affaires</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="exportVentes"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter</button>
+    <button class="btn pri" data-act="newVente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle vente</button>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:15px">
+    ${kpiCard("Chiffre d'affaires", eur(ca), 'i-euro', '#2E8BFF', `<span>hors ventes annulées</span>`)}
+    ${kpiCard('Marge dégagée', eur(mg), 'i-trend', '#32D74B', `<span>${ca ? pct((mg / ca) * 100) : '—'} du CA</span>`)}
+    ${kpiCard('Reste à encaisser', eur(att), 'i-clock', '#FFD426', `<span>${rows.filter(v => v.statut === 'attente').length} vente(s) en attente</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="filters">
+      <select class="inp" data-filter="ventes:statut">
+        <option value="">Tous les statuts</option>
+        <option value="payee" ${f.statut === 'payee' ? 'selected' : ''}>Payées</option>
+        <option value="attente" ${f.statut === 'attente' ? 'selected' : ''}>En attente</option>
+        <option value="annulee" ${f.statut === 'annulee' ? 'selected' : ''}>Annulées</option>
+      </select>
+      <select class="inp" data-filter="ventes:client">
+        <option value="">Tous les clients</option>
+        ${S.db.clients.map(c => `<option value="${c.id}" ${f.client === c.id ? 'selected' : ''}>${esc(c.nom)}</option>`).join('')}
+      </select>
+      <input class="inp" type="date" data-filter="ventes:du" value="${f.du}" title="À partir du">
+      <input class="inp" type="date" data-filter="ventes:au" value="${f.au}" title="Jusqu'au">
+      ${(f.statut || f.client || f.du || f.au) ? `<button class="btn gho sm" data-act="clearFilters:ventes">Réinitialiser</button>` : ''}
+    </div>
+
+    ${rows.length ? `<div class="tbl-scroll"><table>
+      <thead><tr>
+        ${th('ventes', 'client', 'Client')}${th('ventes', 'date', 'Date')}
+        <th class="nos">Détail</th>${th('ventes', 'statut', 'Statut')}
+        ${th('ventes', 'marge', 'Marge', 'num')}${th('ventes', 'total', 'Total', 'num')}
+        <th class="nos"></th></tr></thead>
+      <tbody>${rows.map(v => {
+        const nm = clientName(v.clientId);
+        return `<tr>
+          <td data-open="vente:${v.id}" style="cursor:pointer"><div class="cellflex">
+            <div class="bub" style="background:${hueFor(nm)}">${initials(nm)}</div>
+            <div class="t"><b>${esc(nm)}</b><span>${v.moyen || 'Paiement non précisé'}</span></div></div></td>
+          <td style="color:var(--ink-3);white-space:nowrap">${dfr(v.date)}</td>
+          <td style="color:var(--ink-2);font-size:12.5px">${v.lignes.map(l => `${l.qte}× ${esc(produitName(l.produitId))}`).join('<br>')}</td>
+          <td>${statutVentePill(v.statut)}</td>
+          <td class="num" style="color:#6EE787;font-weight:620">${eur(Calc.margeVente(v))}</td>
+          <td class="num str">${eur(Calc.totalVente(v))}</td>
+          <td><div class="row-act">
+            ${v.statut === 'attente' ? `<button class="btn ico sm suc" data-act="payer:${v.id}" title="Marquer payée"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg></button>` : ''}
+            <button class="btn ico sm" data-act="editVente:${v.id}" title="Modifier"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+            <button class="btn ico sm dgr" data-act="delVente:${v.id}" title="Supprimer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+          </div></td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : emptyState('i-sale', S.search || f.statut ? 'Aucune vente ne correspond' : 'Aucune vente enregistrée',
+        S.search || f.statut ? 'Ajustez vos filtres ou votre recherche pour élargir les résultats.' : 'Chaque vente enregistrée alimente automatiquement votre marge, votre stock et vos statistiques.',
+        `<button class="btn pri" data-act="newVente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Enregistrer une vente</button>`)}
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — COMMANDES FOURNISSEUR
+   ============================================================================ */
+function viewCommandes() {
+  const f = S.filters.commandes || (S.filters.commandes = { statut: '' });
+  let rows = S.db.commandes.filter(c => {
+    if (f.statut && c.statut !== f.statut) return false;
+    if (S.search) {
+      const hay = (c.fournisseur + ' ' + (c.notes || '') + ' ' + c.lignes.map(l => produitName(l.produitId)).join(' ')).toLowerCase();
+      if (!hay.includes(S.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+  rows = applySort(rows, 'commandes', {
+    date: c => c.date, fournisseur: c => c.fournisseur, total: c => Calc.totalCommande(c), statut: c => c.statut
+  });
+
+  const investi = rows.filter(c => c.statut !== 'annulee').reduce((s, c) => s + Calc.totalCommande(c), 0);
+  const enRoute = S.db.commandes.filter(c => c.statut === 'commandee' || c.statut === 'transit');
+  const unites = rows.filter(c => c.statut === 'recue').reduce((s, c) => s + c.lignes.reduce((a, l) => a + l.qte, 0), 0);
+
+  return `
+  <div class="head">
+    <div><h1>Commandes fournisseur</h1><p>Vos achats de stock et leur coût de revient réel, frais de port inclus.</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="exportCmd"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter</button>
+    <button class="btn pri" data-act="newCmd"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle commande</button>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:15px">
+    ${kpiCard('Total investi', eur(investi), 'i-order', '#A78BFA', `<span>sur ${rows.length} commande(s)</span>`)}
+    ${kpiCard('Unités réceptionnées', num(unites), 'i-box', '#5AC8FA', `<span>entrées en stock</span>`)}
+    ${kpiCard('En cours de livraison', num(enRoute.length), 'i-clock', '#FFD426', `<span>${eur(enRoute.reduce((s, c) => s + Calc.totalCommande(c), 0))} engagés</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="filters">
+      <select class="inp" data-filter="commandes:statut">
+        <option value="">Tous les statuts</option>
+        <option value="commandee" ${f.statut === 'commandee' ? 'selected' : ''}>Commandées</option>
+        <option value="transit" ${f.statut === 'transit' ? 'selected' : ''}>En transit</option>
+        <option value="recue" ${f.statut === 'recue' ? 'selected' : ''}>Reçues</option>
+        <option value="annulee" ${f.statut === 'annulee' ? 'selected' : ''}>Annulées</option>
+      </select>
+      ${f.statut ? `<button class="btn gho sm" data-act="clearFilters:commandes">Réinitialiser</button>` : ''}
+    </div>
+
+    ${rows.length ? `<div class="tbl-scroll"><table>
+      <thead><tr>
+        ${th('commandes', 'fournisseur', 'Fournisseur')}${th('commandes', 'date', 'Date')}
+        <th class="nos">Contenu</th><th class="nos num">Frais</th>${th('commandes', 'statut', 'Statut')}
+        ${th('commandes', 'total', 'Total', 'num')}<th class="nos"></th></tr></thead>
+      <tbody>${rows.map(c => `<tr>
+        <td class="str">${esc(c.fournisseur)}</td>
+        <td style="color:var(--ink-3);white-space:nowrap">${dfr(c.date)}</td>
+        <td style="color:var(--ink-2);font-size:12.5px">${c.lignes.map(l => `${l.qte}× ${esc(produitName(l.produitId))} <span style="color:var(--ink-4)">à ${eur(l.cout)}</span>`).join('<br>')}</td>
+        <td class="num" style="color:var(--ink-3)">${c.frais ? eur(c.frais) : '—'}</td>
+        <td>${statutCmdPill(c.statut)}</td>
+        <td class="num str">${eur(Calc.totalCommande(c))}</td>
+        <td><div class="row-act">
+          ${c.statut !== 'recue' && c.statut !== 'annulee' ? `<button class="btn ico sm suc" data-act="receptionner:${c.id}" title="Réceptionner"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg></button>` : ''}
+          <button class="btn ico sm" data-act="editCmd:${c.id}" title="Modifier"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+          <button class="btn ico sm dgr" data-act="delCmd:${c.id}" title="Supprimer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+        </div></td></tr>`).join('')}</tbody></table></div>`
+      : emptyState('i-order', 'Aucune commande enregistrée',
+        'Enregistrez vos achats fournisseur : le stock se met à jour à la réception et le coût de revient se calcule tout seul.',
+        `<button class="btn pri" data-act="newCmd"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Enregistrer une commande</button>`)}
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — STOCK
+   ============================================================================ */
+function viewStock() {
+  const prods = S.db.produits.filter(p => p.actif !== false);
+  const valeur = Calc.valeurStock();
+  const total = prods.reduce((s, p) => s + Math.max(0, Calc.stock(p.id)), 0);
+  const ruptures = prods.filter(p => Calc.stock(p.id) <= 0).length;
+  const potentiel = prods.reduce((s, p) => s + Math.max(0, Calc.stock(p.id)) * (Number(p.prixRef) || 0), 0);
+  const alertes = Calc.alertes();
+
+  return `
+  <div class="head">
+    <div><h1>Stock</h1><p>Vos quantités disponibles, valorisées au prix moyen pondéré d'achat.</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="newCmd"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Réapprovisionner</button>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard('Unités disponibles', num(total), 'i-stock', '#5AC8FA', `<span>tous produits confondus</span>`)}
+    ${kpiCard('Valeur du stock', eur(valeur), 'i-euro', '#2E8BFF', `<span>au coût de revient</span>`)}
+    ${kpiCard('Potentiel de vente', eur(potentiel), 'i-target', '#32D74B', `<span>soit ${eur(potentiel - valeur)} de marge</span>`)}
+    ${kpiCard('Ruptures', num(ruptures), 'i-alert', ruptures ? '#FF453A' : '#32D74B', `<span>${ruptures ? 'à réapprovisionner' : 'aucune rupture'}</span>`)}
+  </div>
+
+  ${alertes.filter(a => a.n !== 'b').length ? `<div class="glass card" style="margin-bottom:15px">
+    <div class="card-h"><div><h3>À traiter</h3></div></div>
+    ${alertes.filter(a => a.n !== 'b').map(a => `<div class="alert ${a.n}">
+      <svg viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+      <div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>
+      <button class="btn sm" data-act="newCmd">Commander</button></div>`).join('')}
+  </div>` : ''}
+
+  <div class="glass card">
+    <div class="card-h"><div><h3>Détail par produit</h3><div class="sub">Entrées, sorties et coût de revient réel</div></div></div>
+    ${prods.length ? `<div class="tbl-scroll"><table>
+      <thead><tr><th class="nos">Produit</th><th class="nos num">Entrées</th><th class="nos num">Sorties</th>
+        <th class="nos num">En commande</th><th class="nos num">Disponible</th><th class="nos num">PMP</th>
+        <th class="nos num">Valeur</th><th class="nos">Niveau</th></tr></thead>
+      <tbody>${prods.map(p => {
+        const st = Calc.stock(p.id), seuil = Number(p.seuil) || 0;
+        const ratio = seuil ? clamp(st / (seuil * 2.5), 0, 1) : (st > 0 ? 1 : 0);
+        const cls = st <= 0 ? 'r' : (seuil && st <= seuil) ? 'o' : 'g';
+        return `<tr>
+          <td><div class="cellflex"><div class="bub" style="background:${hueFor(p.nom)}">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#i-nfc"/></svg></div>
+            <div class="t"><b>${esc(p.nom)}</b><span>${esc(p.ref || '')} · seuil ${seuil}</span></div></div></td>
+          <td class="num" style="color:var(--ink-3)">${num(Calc.entre(p.id))}</td>
+          <td class="num" style="color:var(--ink-3)">${num(Calc.sorti(p.id))}</td>
+          <td class="num" style="color:${Calc.enCommande(p.id) ? '#7FB8FF' : 'var(--ink-4)'}">${Calc.enCommande(p.id) ? num(Calc.enCommande(p.id)) : '—'}</td>
+          <td class="num" style="font-size:16px;font-weight:700;color:${st <= 0 ? '#FF8078' : st <= seuil ? '#FFDF6B' : 'var(--ink)'}">${num(st)}</td>
+          <td class="num" style="color:var(--ink-2)">${eur(Calc.pmp(p.id))}</td>
+          <td class="num str">${eur(Math.max(0, st) * Calc.pmp(p.id))}</td>
+          <td style="min-width:110px"><div class="pbar ${cls}"><i style="width:${ratio * 100}%"></i></div></td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : emptyState('i-stock', 'Aucun produit au catalogue', 'Ajoutez vos références pour commencer à suivre votre stock.',
+        `<button class="btn pri" data-go="catalogue">Ouvrir le catalogue</button>`)}
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — CLIENTS
+   ============================================================================ */
+function viewClients() {
+  const f = S.filters.clients || (S.filters.clients = { statut: '' });
+  let rows = S.db.clients.filter(c => {
+    if (f.statut && c.statut !== f.statut) return false;
+    if (S.search) {
+      const hay = [c.nom, c.ville, c.contact, c.email, c.tel, c.notes].join(' ').toLowerCase();
+      if (!hay.includes(S.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+  rows = applySort(rows, 'clients', {
+    nom: c => c.nom, ville: c => c.ville || '', ca: c => Calc.caClient(c.id), statut: c => c.statut || '',
+    date: c => c.createdAt || ''
+  });
+
+  const actifs = S.db.clients.filter(c => Calc.caClient(c.id) > 0).length;
+  const prospects = S.db.clients.filter(c => c.statut === 'prospect').length;
+  const caMoyen = actifs ? S.db.clients.reduce((s, c) => s + Calc.caClient(c.id), 0) / actifs : 0;
+
+  return `
+  <div class="head">
+    <div><h1>Clients</h1><p>Vos commerces partenaires et vos prospects en cours.</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="exportClients"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter</button>
+    <button class="btn pri" data-act="newClient"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouveau client</button>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:15px">
+    ${kpiCard('Clients actifs', num(actifs), 'i-client', '#2E8BFF', `<span>ont déjà acheté</span>`)}
+    ${kpiCard('Prospects à relancer', num(prospects), 'i-target', '#FFD426', `<span>aucune vente enregistrée</span>`)}
+    ${kpiCard('CA moyen par client', eur(caMoyen), 'i-euro', '#32D74B', `<span>sur les clients actifs</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="filters">
+      <select class="inp" data-filter="clients:statut">
+        <option value="">Tous les statuts</option>
+        <option value="client" ${f.statut === 'client' ? 'selected' : ''}>Clients</option>
+        <option value="prospect" ${f.statut === 'prospect' ? 'selected' : ''}>Prospects</option>
+        <option value="inactif" ${f.statut === 'inactif' ? 'selected' : ''}>Inactifs</option>
+      </select>
+      ${f.statut ? `<button class="btn gho sm" data-act="clearFilters:clients">Réinitialiser</button>` : ''}
+    </div>
+
+    ${rows.length ? `<div class="tbl-scroll"><table>
+      <thead><tr>${th('clients', 'nom', 'Commerce')}${th('clients', 'ville', 'Ville')}
+        <th class="nos">Contact</th>${th('clients', 'statut', 'Statut')}
+        <th class="nos num">Ventes</th>${th('clients', 'ca', 'CA généré', 'num')}<th class="nos"></th></tr></thead>
+      <tbody>${rows.map(c => {
+        const nb = S.db.ventes.filter(v => v.clientId === c.id && v.statut !== 'annulee').length;
+        const pillCls = { client: 'g', prospect: 'o', inactif: 'n' }[c.statut] || 'n';
+        const pillTxt = { client: 'Client', prospect: 'Prospect', inactif: 'Inactif' }[c.statut] || '—';
+        return `<tr>
+          <td data-open="client:${c.id}" style="cursor:pointer"><div class="cellflex">
+            <div class="bub" style="background:${hueFor(c.nom)}">${initials(c.nom)}</div>
+            <div class="t"><b>${esc(c.nom)}</b><span>${esc(c.contact || 'Contact non renseigné')}</span></div></div></td>
+          <td style="color:var(--ink-2)">${esc(c.ville || '—')}</td>
+          <td style="color:var(--ink-3);font-size:12.5px">${esc(c.tel || c.email || '—')}</td>
+          <td><span class="pill ${pillCls}">${pillTxt}</span></td>
+          <td class="num" style="color:var(--ink-2)">${num(nb)}</td>
+          <td class="num str">${eur(Calc.caClient(c.id))}</td>
+          <td><div class="row-act">
+            <button class="btn ico sm" data-act="venteFor:${c.id}" title="Nouvelle vente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg></button>
+            <button class="btn ico sm" data-act="editClient:${c.id}" title="Modifier"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+            <button class="btn ico sm dgr" data-act="delClient:${c.id}" title="Supprimer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+          </div></td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : emptyState('i-client', S.search ? 'Aucun client ne correspond' : 'Aucun client enregistré',
+        S.search ? 'Essayez un autre terme de recherche.' : 'Ajoutez les commerces que vous démarchez pour suivre leur historique d’achat.',
+        `<button class="btn pri" data-act="newClient"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Ajouter un client</button>`)}
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — CATALOGUE
+   ============================================================================ */
+function viewCatalogue() {
+  const rows = S.db.produits.filter(p => !S.search || p.nom.toLowerCase().includes(S.search.toLowerCase()));
+  return `
+  <div class="head">
+    <div><h1>Catalogue</h1><p>Vos références, leurs tarifs de référence et leur seuil d'alerte.</p></div>
+    <div class="spacer"></div>
+    <button class="btn pri" data-act="newProduit"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouveau produit</button>
+  </div>
+
+  <div class="grid g2">
+    ${rows.map(p => {
+      const pmp = Calc.pmp(p.id), st = Calc.stock(p.id);
+      const marge = (Number(p.prixRef) || 0) - pmp;
+      const tx = p.prixRef ? (marge / p.prixRef) * 100 : 0;
+      return `<div class="glass card">
+        <div class="card-h">
+          <div class="bub" style="width:38px;height:38px;border-radius:12px;background:${hueFor(p.nom)}">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px"><use href="#i-nfc"/></svg></div>
+          <div style="flex:1;min-width:0">
+            <h3>${esc(p.nom)}</h3>
+            <div class="sub">${esc(p.ref || 'sans référence')} ${p.actif === false ? '· <span style="color:#FF8078">désactivé</span>' : ''}</div>
+          </div>
+          <button class="btn ico sm" data-act="editProduit:${p.id}"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+          <button class="btn ico sm dgr" data-act="delProduit:${p.id}"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:11px">
+          <div><div class="kpi-lbl" style="font-size:10.5px">Coût réel</div>
+            <div style="font-size:18px;font-weight:680;letter-spacing:-.03em;margin-top:3px">${eur(pmp)}</div></div>
+          <div><div class="kpi-lbl" style="font-size:10.5px">Prix conseillé</div>
+            <div style="font-size:18px;font-weight:680;letter-spacing:-.03em;margin-top:3px">${eur(p.prixRef)}</div></div>
+          <div><div class="kpi-lbl" style="font-size:10.5px">Marge</div>
+            <div style="font-size:18px;font-weight:680;letter-spacing:-.03em;margin-top:3px;color:${marge > 0 ? '#6EE787' : '#FF8078'}">${eur(marge)}</div></div>
+        </div>
+        <div class="divider" style="margin:15px 0"></div>
+        <div style="display:flex;align-items:center;gap:11px">
+          <span class="pill ${tx >= 70 ? 'g' : tx >= 40 ? 'b' : 'o'} np">${pct(tx)} de taux de marge</span>
+          <div class="spacer" style="flex:1"></div>
+          <span style="font-size:12.5px;color:var(--ink-3)">Stock</span>
+          <span style="font-size:17px;font-weight:700;color:${st <= 0 ? '#FF8078' : st <= (p.seuil || 0) ? '#FFDF6B' : 'var(--ink)'}">${num(st)}</span>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  ${!rows.length ? emptyState('i-tag', 'Aucun produit', 'Créez vos références pour pouvoir enregistrer des ventes et des commandes.',
+    `<button class="btn pri" data-act="newProduit"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Créer un produit</button>`) : ''}`;
+}
+
+/* ============================================================================
+   VUE — CHARGES
+   ============================================================================ */
+const CAT_CHARGES = ['Publicité', 'Déplacements', 'Matériel', 'Logiciels', 'Frais bancaires', 'Sous-traitance', 'Autre'];
+
+function viewCharges() {
+  let rows = S.db.charges.filter(c => !S.search || (c.libelle + ' ' + c.categorie).toLowerCase().includes(S.search.toLowerCase()));
+  rows = applySort(rows, 'charges', { date: c => c.date, libelle: c => c.libelle, montant: c => Number(c.montant) || 0, categorie: c => c.categorie || '' });
+  const [d1, d2] = Calc.bornes('annee');
+  const totalAn = Calc.chargesEntre(d1, d2);
+  const totalMois = Calc.chargesEntre(...Calc.bornes('mois'));
+
+  const parCat = CAT_CHARGES.map((cat, i) => ({
+    n: cat, c: HUES[i % HUES.length],
+    v: S.db.charges.filter(c => c.categorie === cat && c.date >= d1 && c.date <= d2).reduce((s, c) => s + (Number(c.montant) || 0), 0)
+  })).filter(x => x.v > 0);
+
+  return `
+  <div class="head">
+    <div><h1>Charges</h1><p>Tout ce qui pèse sur votre résultat en dehors du coût d'achat des cartes.</p></div>
+    <div class="spacer"></div>
+    <button class="btn pri" data-act="newCharge"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle charge</button>
+  </div>
+
+  <div class="grid g-23">
+    <div style="display:flex;flex-direction:column;gap:15px">
+      <div class="grid g2">
+        ${kpiCard('Charges du mois', eur(totalMois), 'i-charge', '#FF8A5B', `<span>mois en cours</span>`)}
+        ${kpiCard("Charges de l'année", eur(totalAn), 'i-cal', '#A78BFA', `<span>${S.db.charges.filter(c => c.date >= d1).length} écriture(s)</span>`)}
+      </div>
+      <div class="glass card">
+        <div class="card-h"><div><h3>Écritures</h3></div></div>
+        ${rows.length ? `<div class="tbl-scroll"><table>
+          <thead><tr>${th('charges', 'libelle', 'Libellé')}${th('charges', 'categorie', 'Catégorie')}
+            ${th('charges', 'date', 'Date')}${th('charges', 'montant', 'Montant', 'num')}<th class="nos"></th></tr></thead>
+          <tbody>${rows.map(c => `<tr>
+            <td class="str">${esc(c.libelle)}</td>
+            <td><span class="pill n">${esc(c.categorie || 'Autre')}</span></td>
+            <td style="color:var(--ink-3);white-space:nowrap">${dfr(c.date)}</td>
+            <td class="num str" style="color:#FF9E80">−${eur(c.montant)}</td>
+            <td><div class="row-act">
+              <button class="btn ico sm" data-act="editCharge:${c.id}"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+              <button class="btn ico sm dgr" data-act="delCharge:${c.id}"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+            </div></td></tr>`).join('')}</tbody></table></div>`
+          : emptyState('i-charge', 'Aucune charge enregistrée', 'Ajoutez vos frais (publicité, déplacements, matériel) pour connaître votre résultat net réel.',
+            `<button class="btn pri" data-act="newCharge"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Ajouter une charge</button>`)}
+      </div>
+    </div>
+    <div class="glass card" style="align-self:flex-start">
+      <div class="card-h"><div><h3>Répartition</h3><div class="sub">Année en cours</div></div></div>
+      ${chartDonut(parCat)}
+      ${parCat.length ? `<div class="legend" style="margin-top:15px">${parCat.map(p => `
+        <div class="leg"><span class="dot" style="background:${p.c}"></span>
+          <span class="nm">${esc(p.n)}</span><span class="vl">${eur0(p.v)}</span></div>`).join('')}</div>` : ''}
+    </div>
+  </div>`;
+}
+/* ============================================================================
+   VUE — RAPPORTS
+   ============================================================================ */
+function viewRapports() {
+  const serie = Calc.serie12();
+  const [d1, d2] = Calc.bornes(S.period);
+  const vs = Calc.ventesEntre(d1, d2);
+  const ca = Calc.caEntre(d1, d2), mg = Calc.margeEntre(d1, d2), ch = Calc.chargesEntre(d1, d2);
+  const cogs = ca - mg;
+  const periodLbl = { mois: 'Mois en cours', moisPrec: 'Mois dernier', trim: 'Trimestre en cours', annee: 'Année en cours', tout: 'Depuis le début' }[S.period];
+
+  /* performance par produit */
+  const perf = S.db.produits.map(p => {
+    let qte = 0, caP = 0, cout = 0;
+    for (const v of vs) for (const l of v.lignes) if (l.produitId === p.id) {
+      qte += l.qte; caP += l.qte * l.prix; cout += l.qte * Calc.pmp(p.id);
+    }
+    return { p, qte, ca: caP, marge: caP - cout, tx: caP ? ((caP - cout) / caP) * 100 : 0 };
+  }).filter(x => x.qte > 0).sort((a, b) => b.ca - a.ca);
+
+  /* moyens de paiement */
+  const MOYENS = ['Espèces', 'Virement', 'Carte bancaire', 'PayPal', 'Chèque'];
+  const parMoyen = MOYENS.map((m, i) => ({ n: m, c: HUES[i % HUES.length], v: vs.filter(v => v.moyen === m).reduce((s, v) => s + Calc.totalVente(v), 0) })).filter(x => x.v > 0);
+
+  const meilleurMois = [...serie].sort((a, b) => b.ca - a.ca)[0];
+  const moyMensuelle = serie.filter(m => m.ca > 0).length ? serie.reduce((s, m) => s + m.ca, 0) / serie.filter(m => m.ca > 0).length : 0;
+
+  return `
+  <div class="head">
+    <div><h1>Rapports</h1><p>L'analyse détaillée de votre activité, période par période.</p></div>
+    <div class="spacer"></div>
+    <div class="seg" id="periodSeg">
+      ${[['mois', 'Mois'], ['moisPrec', 'M-1'], ['trim', 'Trimestre'], ['annee', 'Année'], ['tout', 'Tout']]
+      .map(([k, l]) => `<button data-p="${k}" class="${S.period === k ? 'on' : ''}">${l}</button>`).join('')}
+    </div>
+    <button class="btn" data-act="exportGlobal"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter</button>
+  </div>
+
+  <div class="glass card" style="margin-bottom:15px">
+    <div class="card-h"><div><h3>Compte de résultat simplifié</h3><div class="sub">${periodLbl}</div></div></div>
+    <div class="grid g2" style="gap:22px">
+      <div>
+        <div class="trow"><span>Chiffre d'affaires</span><b>${eur(ca)}</b></div>
+        <div class="trow"><span>Coût d'achat des marchandises vendues</span><b style="color:#FF9E80">−${eur(cogs)}</b></div>
+        <div class="trow mg" style="border-top:1px solid rgba(255,255,255,.09);padding-top:9px;margin-top:4px">
+          <span>Marge brute</span><b>${eur(mg)}</b></div>
+        <div class="trow"><span>Charges d'exploitation</span><b style="color:#FF9E80">−${eur(ch)}</b></div>
+        <div class="trow big"><span>Résultat net</span><b style="color:${mg - ch >= 0 ? '#6EE787' : '#FF8078'}">${eur(mg - ch)}</b></div>
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:15px">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px">
+            <span style="color:var(--ink-2)">Taux de marge brute</span><b>${ca ? pct((mg / ca) * 100) : '—'}</b></div>
+          <div class="pbar g"><i style="width:${ca ? clamp(mg / ca, 0, 1) * 100 : 0}%"></i></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px">
+            <span style="color:var(--ink-2)">Taux de rentabilité nette</span><b>${ca ? pct(((mg - ch) / ca) * 100) : '—'}</b></div>
+          <div class="pbar ${mg - ch >= 0 ? '' : 'r'}"><i style="width:${ca ? clamp(Math.abs(mg - ch) / ca, 0, 1) * 100 : 0}%"></i></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:7px">
+            <span style="color:var(--ink-2)">Poids des charges</span><b>${ca ? pct((ch / ca) * 100) : '—'}</b></div>
+          <div class="pbar o"><i style="width:${ca ? clamp(ch / ca, 0, 1) * 100 : 0}%"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard('Meilleur mois', meilleurMois && meilleurMois.ca ? eur0(meilleurMois.ca) : '—', 'i-spark', '#FFD426',
+      `<span>${meilleurMois && meilleurMois.ca ? meilleurMois.label + ' ' + meilleurMois.annee : 'pas encore de donnée'}</span>`)}
+    ${kpiCard('Moyenne mensuelle', eur0(moyMensuelle), 'i-chart', '#2E8BFF', `<span>sur les mois actifs</span>`)}
+    ${kpiCard('Unités vendues', num(vs.reduce((s, v) => s + v.lignes.reduce((a, l) => a + l.qte, 0), 0)), 'i-box', '#5AC8FA', `<span>${periodLbl.toLowerCase()}</span>`)}
+    ${kpiCard('Marge par unité', (() => { const u = vs.reduce((s, v) => s + v.lignes.reduce((a, l) => a + l.qte, 0), 0); return u ? eur(mg / u) : '—'; })(), 'i-target', '#32D74B', `<span>en moyenne</span>`)}
+  </div>
+
+  <div class="glass card" style="margin-bottom:15px">
+    <div class="card-h"><div><h3>Évolution sur 12 mois</h3><div class="sub">Chiffre d'affaires et marge</div></div></div>
+    ${chartBars(serie)}
+  </div>
+
+  <div class="grid g-23">
+    <div class="glass card">
+      <div class="card-h"><div><h3>Performance par produit</h3><div class="sub">${periodLbl}</div></div></div>
+      ${perf.length ? `<div class="tbl-scroll"><table>
+        <thead><tr><th class="nos">Produit</th><th class="nos num">Unités</th><th class="nos num">CA</th>
+          <th class="nos num">Marge</th><th class="nos num">Taux</th><th class="nos">Part du CA</th></tr></thead>
+        <tbody>${perf.map(x => `<tr>
+          <td class="str">${esc(x.p.nom)}</td>
+          <td class="num" style="color:var(--ink-2)">${num(x.qte)}</td>
+          <td class="num str">${eur(x.ca)}</td>
+          <td class="num" style="color:#6EE787;font-weight:620">${eur(x.marge)}</td>
+          <td class="num"><span class="pill ${x.tx >= 70 ? 'g' : x.tx >= 40 ? 'b' : 'o'} np">${pct(x.tx)}</span></td>
+          <td style="min-width:110px"><div class="pbar"><i style="width:${ca ? (x.ca / ca) * 100 : 0}%"></i></div></td></tr>`).join('')}
+        </tbody></table></div>`
+        : `<div style="padding:34px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Aucune vente sur la période sélectionnée</div>`}
+    </div>
+    <div class="glass card" style="align-self:flex-start">
+      <div class="card-h"><div><h3>Moyens de paiement</h3></div></div>
+      ${chartDonut(parMoyen)}
+      ${parMoyen.length ? `<div class="legend" style="margin-top:15px">${parMoyen.map(p => `
+        <div class="leg"><span class="dot" style="background:${p.c}"></span>
+          <span class="nm">${esc(p.n)}</span><span class="vl">${eur0(p.v)}</span></div>`).join('')}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — RÉGLAGES
+   ============================================================================ */
+function viewParams() {
+  const st = S.db.settings;
+  const nb = { v: S.db.ventes.length, c: S.db.commandes.length, cl: S.db.clients.length, p: S.db.produits.length, ch: S.db.charges.length };
+  return `
+  <div class="head"><div><h1>Réglages</h1><p>Votre compte, vos objectifs et vos données.</p></div></div>
+
+  <div class="grid g2">
+    <div style="display:flex;flex-direction:column;gap:15px">
+      <div class="glass card">
+        <div class="card-h">
+          <div class="avatar ${S.user.isAdmin ? 'adm' : ''}" style="cursor:default">${initials(S.user.name)}</div>
+          <div><h3>${esc(S.user.name)}</h3><div class="sub">${esc(S.user.email)}</div></div>
+        </div>
+        <div class="sw-row"><div class="t"><b>Type de compte</b><span>Définit les écrans auxquels vous avez accès</span></div>
+          <span class="pill ${S.user.isAdmin ? 'o' : 'b'}">${S.user.isAdmin ? 'Administrateur' : 'Utilisateur'}</span></div>
+        <div class="sw-row"><div class="t"><b>Compte créé le</b><span>${new Date(S.user.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div></div>
+        <div class="sw-row"><div class="t"><b>Stockage des données</b><span>Supabase — synchronisé sur tous vos appareils</span></div></div>
+        <button class="btn dgr block" data-act="logout" style="margin-top:15px">
+          <svg viewBox="0 0 24 24"><use href="#i-out"/></svg>Se déconnecter</button>
+      </div>
+
+      <div class="glass card">
+        <div class="card-h"><div><h3>Objectif commercial</h3><div class="sub">Suivi affiché sur le tableau de bord</div></div></div>
+        <div class="field">
+          <label for="setObj">Objectif de chiffre d'affaires mensuel</label>
+          <input class="inp" id="setObj" type="number" min="0" step="50" value="${st.objectif}">
+          <span class="hint">Utilisé pour l'anneau de progression et les alertes de fin de mois.</span>
+        </div>
+        <button class="btn pri" data-act="saveObj" style="margin-top:15px">Enregistrer l'objectif</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:15px">
+      <div class="glass card">
+        <div class="card-h"><div><h3>Préférences</h3></div></div>
+        <div class="sw-row"><div class="t"><b>Alertes de stock bas</b><span>Affiche un avertissement dès qu'un produit passe sous son seuil</span></div>
+          <div class="sw ${st.alertesStock ? 'on' : ''}" data-act="toggle:alertesStock"></div></div>
+        <div class="sw-row"><div class="t"><b>Assujetti à la TVA</b><span>Affiche les montants HT et la TVA collectée sur les rapports</span></div>
+          <div class="sw ${st.assujettiTVA ? 'on' : ''}" data-act="toggle:assujettiTVA"></div></div>
+        ${st.assujettiTVA ? `<div class="field" style="margin-top:13px">
+          <label for="setTva">Taux de TVA applicable (%)</label>
+          <input class="inp" id="setTva" type="number" min="0" max="100" step="0.1" value="${st.tvaTaux}" data-save="tvaTaux">
+        </div>` : ''}
+      </div>
+
+      <div class="glass card">
+        <div class="card-h"><div><h3>Vos données</h3><div class="sub">${nb.v} ventes · ${nb.c} commandes · ${nb.cl} clients · ${nb.p} produits · ${nb.ch} charges</div></div></div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <button class="btn block" data-act="exportGlobal"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter toutes mes données (JSON)</button>
+          <button class="btn block" data-act="exportVentes"><svg viewBox="0 0 24 24"><use href="#i-dl"/></svg>Exporter les ventes (CSV)</button>
+          ${!nb.v && !nb.c ? `<button class="btn block" data-act="seedDemo"><svg viewBox="0 0 24 24"><use href="#i-spark"/></svg>Charger un jeu de démonstration</button>` : ''}
+          <button class="btn dgr block" data-act="resetData"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg>Effacer toutes mes données</button>
+        </div>
+      </div>
+
+      <div class="glass card">
+        <div class="card-h"><div><h3>Raccourcis</h3></div></div>
+        <div style="display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--ink-2)">
+          <div style="display:flex;justify-content:space-between"><span>Nouvelle vente</span><span class="kbd">V</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Nouvelle commande</span><span class="kbd">C</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Nouveau client</span><span class="kbd">N</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Rechercher</span><span class="kbd">/</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Fermer une fenêtre</span><span class="kbd">Échap</span></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================================
+   VUE — ADMINISTRATION (réservée à ADMIN_EMAIL)
+   ============================================================================ */
+function viewAdmin() {
+  if (!S.user.isAdmin) return emptyState('i-lock', 'Accès réservé', "Cet écran n'est accessible qu'à l'administrateur de la plateforme.");
+
+  const us = S.allUsers || [];
+  const totCA = us.reduce((s, u) => s + (u._stats?.ca || 0), 0);
+  const totVentes = us.reduce((s, u) => s + (u._stats?.nbV || 0), 0);
+  const actifs = us.filter(u => (u._stats?.nbV || 0) > 0).length;
+
+  return `
+  <div class="head">
+    <div><h1>Administration</h1><p>Vue d'ensemble de la plateforme et gestion des comptes.</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="reloadAdmin"><svg viewBox="0 0 24 24"><use href="#i-chart"/></svg>Actualiser</button>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard('Comptes créés', num(us.length), 'i-client', '#2E8BFF', `<span>${actifs} avec au moins une vente</span>`)}
+    ${kpiCard('CA cumulé', eur(totCA), 'i-euro', '#32D74B', `<span>tous utilisateurs confondus</span>`)}
+    ${kpiCard('Ventes enregistrées', num(totVentes), 'i-sale', '#A78BFA', `<span>sur la plateforme</span>`)}
+    ${kpiCard('CA moyen par compte', eur(us.length ? totCA / us.length : 0), 'i-target', '#FFD426', `<span>toutes périodes</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="card-h"><div><h3>Comptes utilisateurs</h3><div class="sub">Désactiver un compte empêche sa connexion sans supprimer ses données</div></div></div>
+    ${us.length ? `<div class="tbl-scroll"><table>
+      <thead><tr><th class="nos">Utilisateur</th><th class="nos">Inscription</th><th class="nos">Rôle</th>
+        <th class="nos num">Clients</th><th class="nos num">Ventes</th><th class="nos num">CA généré</th>
+        <th class="nos">État</th><th class="nos"></th></tr></thead>
+      <tbody>${us.map(u => {
+        const isAdm = u.email === ADMIN_EMAIL, me = u.id === S.user.id;
+        return `<tr>
+          <td><div class="cellflex"><div class="bub" style="background:${isAdm ? 'linear-gradient(150deg,#FFB020,#FF6B35)' : hueFor(u.name)}">${initials(u.name)}</div>
+            <div class="t"><b>${esc(u.name)}${me ? ' <span style="color:var(--ink-4);font-weight:500">(vous)</span>' : ''}</b><span>${esc(u.email)}</span></div></div></td>
+          <td style="color:var(--ink-3);white-space:nowrap">${dfr(String(u.createdAt).slice(0, 10))}</td>
+          <td><span class="pill ${isAdm ? 'o' : 'b'}">${isAdm ? 'Administrateur' : 'Utilisateur'}</span></td>
+          <td class="num" style="color:var(--ink-2)">${num(u._stats?.nbC || 0)}</td>
+          <td class="num" style="color:var(--ink-2)">${num(u._stats?.nbV || 0)}</td>
+          <td class="num str">${eur(u._stats?.ca || 0)}</td>
+          <td>${u.actif === false ? '<span class="pill r">Désactivé</span>' : '<span class="pill g">Actif</span>'}</td>
+          <td><div class="row-act">
+            ${!me ? `<button class="btn sm ${u.actif === false ? 'suc' : 'dgr'}" data-act="toggleUser:${u.id}">${u.actif === false ? 'Réactiver' : 'Désactiver'}</button>
+                     <button class="btn ico sm dgr" data-act="delUser:${u.id}" title="Purger les données"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>` : ''}
+          </div></td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : `<div style="padding:34px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Chargement des comptes…</div>`}
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Paramètres de la plateforme</h3></div></div>
+    <div class="sw-row"><div class="t"><b>Adresse administrateur</b><span>Seul ce compte accède à cet écran. Modifiable dans le code, constante <span class="mono">ADMIN_EMAIL</span>.</span></div>
+      <span class="chip mono">${esc(ADMIN_EMAIL)}</span></div>
+    <div class="sw-row"><div class="t"><b>Base de données</b><span>Postgres hébergé, isolation par Row Level Security</span></div>
+      <span class="chip mono">${esc(SUPABASE_URL.replace('https://', ''))}</span></div>
+  </div>`;
+}
+
+async function loadAdmin() {
+  const lignes = await API.statsAdmin();
+  S.allUsers = lignes.map(r => ({
+    id: r.id, email: r.email, name: r.nom || r.email.split('@')[0],
+    actif: r.actif, createdAt: r.created_at,
+    _stats: { nbV: Number(r.nb_ventes) || 0, nbC: Number(r.nb_clients) || 0, ca: Number(r.ca) || 0 }
+  }));
+}
+
+/* ============================================================================
+   FENÊTRES MODALES
+   ============================================================================ */
+let draft = null;
+
+function openModal(html) {
+  $('#modalRoot').innerHTML = `<div class="scrim" id="scrim">${html}</div>`;
+  const scrim = $('#scrim');
+  scrim.addEventListener('mousedown', e => { if (e.target === scrim) closeModal(); });
+  wireModal();
+  setTimeout(() => { const f = $('#scrim .inp:not([type=date])'); if (f && window.innerWidth > 900) f.focus(); }, 90);
+}
+function closeModal() { $('#modalRoot').innerHTML = ''; draft = null; }
+
+function confirmer(titre, texte, libelle = 'Supprimer', danger = true) {
+  return new Promise(res => {
+    openModal(`<div class="sheet narrow">
+      <div class="sheet-h"><div><h2>${esc(titre)}</h2></div></div>
+      <div class="sheet-b" style="font-size:13.5px;color:var(--ink-2);line-height:1.6">${esc(texte)}</div>
+      <div class="sheet-f"><div class="spacer"></div>
+        <button class="btn" id="cNo">Annuler</button>
+        <button class="btn ${danger ? 'dgr' : 'pri'}" id="cYes">${esc(libelle)}</button></div>
+    </div>`);
+    $('#cNo').onclick = () => { closeModal(); res(false); };
+    $('#cYes').onclick = () => { closeModal(); res(true); };
+  });
+}
+
+/* ---------- Constructeur de lignes ---------- */
+function renderLines(kind) {
+  const box = $('#linesBox');
+  if (!box) return;
+  const prods = S.db.produits.filter(p => p.actif !== false);
+  box.innerHTML = draft.lignes.map((l, i) => {
+    const p = S.db.produits.find(x => x.id === l.produitId);
+    const dispo = p ? Calc.stock(p.id) : 0;
+    const champ = kind === 'vente' ? 'prix' : 'cout';
+    return `<div class="line">
+      <select class="inp" data-l="${i}:produitId">
+        ${prods.map(x => `<option value="${x.id}" ${x.id === l.produitId ? 'selected' : ''}>${esc(x.nom)}</option>`).join('')}
+      </select>
+      <input class="inp" type="number" min="1" step="1" value="${l.qte}" data-l="${i}:qte" title="Quantité">
+      <input class="inp" type="number" min="0" step="0.01" value="${l[champ]}" data-l="${i}:${champ}" title="${kind === 'vente' ? 'Prix unitaire' : 'Coût unitaire'}">
+      <div class="tot">${eur(l.qte * l[champ])}</div>
+      <button class="line-x" data-rml="${i}" title="Retirer"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+      ${kind === 'vente' && l.qte > dispo ? `<div style="grid-column:1/-1;font-size:11px;color:#FFDF6B;margin-top:2px">
+        Stock disponible : ${dispo} — la vente passera le stock en négatif.</div>` : ''}
+    </div>`;
+  }).join('') || `<div style="padding:18px;text-align:center;color:var(--ink-4);font-size:12.5px;border:1px dashed var(--stroke);border-radius:var(--r-sm)">Ajoutez au moins une ligne</div>`;
+
+  box.querySelectorAll('[data-l]').forEach(el => {
+    el.oninput = () => {
+      const [i, f] = el.dataset.l.split(':');
+      let v = el.value;
+      if (f === 'qte') v = Math.max(1, parseInt(v) || 1);
+      else if (f !== 'produitId') v = Math.max(0, parseFloat(v) || 0);
+      if (f === 'produitId') {
+        const p = S.db.produits.find(x => x.id === v);
+        draft.lignes[i].produitId = v;
+        if (p) draft.lignes[i][kind === 'vente' ? 'prix' : 'cout'] = kind === 'vente' ? (Number(p.prixRef) || 0) : (Number(p.coutRef) || 0);
+        renderLines(kind);
+      } else draft.lignes[i][f] = v;
+      paintTotals(kind);
+      if (f !== 'produitId') { const t = el.closest('.line').querySelector('.tot'); if (t) t.textContent = eur(draft.lignes[i].qte * draft.lignes[i][kind === 'vente' ? 'prix' : 'cout']); }
+    };
+    el.onchange = () => { if (el.dataset.l.endsWith(':qte')) renderLines(kind); };
+  });
+  box.querySelectorAll('[data-rml]').forEach(b => b.onclick = () => {
+    draft.lignes.splice(+b.dataset.rml, 1); renderLines(kind); paintTotals(kind);
+  });
+  paintTotals(kind);
+}
+
+function paintTotals(kind) {
+  const box = $('#totalsBox');
+  if (!box) return;
+  if (kind === 'vente') {
+    const brut = draft.lignes.reduce((s, l) => s + l.qte * l.prix, 0);
+    const remise = Math.max(0, parseFloat($('#fRemise')?.value) || 0);
+    const cout = draft.lignes.reduce((s, l) => s + l.qte * Calc.pmp(l.produitId), 0);
+    const net = brut - remise;
+    box.innerHTML = `
+      <div class="trow"><span>Sous-total</span><b>${eur(brut)}</b></div>
+      ${remise ? `<div class="trow"><span>Remise accordée</span><b style="color:#FF9E80">−${eur(remise)}</b></div>` : ''}
+      <div class="trow"><span>Coût de revient estimé</span><b style="color:var(--ink-3)">${eur(cout)}</b></div>
+      <div class="trow mg"><span>Marge dégagée</span><b>${eur(net - cout)}${net ? ` <span style="font-size:11.5px;font-weight:560;color:var(--ink-3)">(${pct(((net - cout) / net) * 100)})</span>` : ''}</b></div>
+      <div class="trow big"><span>Total encaissé</span><b>${eur(net)}</b></div>`;
+  } else {
+    const brut = draft.lignes.reduce((s, l) => s + l.qte * l.cout, 0);
+    const frais = Math.max(0, parseFloat($('#fFrais')?.value) || 0);
+    const u = draft.lignes.reduce((s, l) => s + l.qte, 0);
+    box.innerHTML = `
+      <div class="trow"><span>Marchandise</span><b>${eur(brut)}</b></div>
+      ${frais ? `<div class="trow"><span>Frais de port et douane</span><b>${eur(frais)}</b></div>` : ''}
+      <div class="trow"><span>Coût unitaire réel</span><b>${u ? eur((brut + frais) / u) : '—'}</b></div>
+      <div class="trow big"><span>Total commande</span><b>${eur(brut + frais)}</b></div>`;
+  }
+}
+
+/* ---------- Modale VENTE ---------- */
+function modalVente(id, clientPre) {
+  const prods = S.db.produits.filter(p => p.actif !== false);
+  if (!prods.length) { toast('Créez d’abord un produit au catalogue.', 'er'); return go('catalogue'); }
+  const v = id ? S.db.ventes.find(x => x.id === id) : null;
+  draft = {
+    lignes: v ? v.lignes.map(l => ({ ...l })) : [{ produitId: prods[0].id, qte: 1, prix: Number(prods[0].prixRef) || 0 }]
+  };
+  const MOYENS = ['Espèces', 'Virement', 'Carte bancaire', 'PayPal', 'Chèque'];
+
+  openModal(`<div class="sheet wide" id="mVente">
+    <div class="sheet-h">
+      <div><h2>${v ? 'Modifier la vente' : 'Nouvelle vente'}</h2>
+        <p>${v ? 'Les totaux et le stock seront recalculés.' : 'Le stock et la marge se mettent à jour automatiquement.'}</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="sheet-b">
+      <div class="form-grid" style="margin-bottom:18px">
+        <div class="field">
+          <label for="fClient">Client</label>
+          <select class="inp" id="fClient">
+            <option value="">Client de passage</option>
+            ${S.db.clients.map(c => `<option value="${c.id}" ${(v?.clientId || clientPre) === c.id ? 'selected' : ''}>${esc(c.nom)}${c.ville ? ' — ' + esc(c.ville) : ''}</option>`).join('')}
+          </select>
+          <span class="hint">Laissez sur « Client de passage » pour une vente ponctuelle.</span>
+        </div>
+        <div class="field"><label for="fDate">Date de la vente</label>
+          <input class="inp" id="fDate" type="date" value="${v?.date || today()}"></div>
+        <div class="field"><label for="fMoyen">Moyen de paiement</label>
+          <select class="inp" id="fMoyen">${MOYENS.map(m => `<option ${v?.moyen === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+        <div class="field"><label for="fStatut">Statut</label>
+          <select class="inp" id="fStatut">
+            <option value="payee" ${(v?.statut || 'payee') === 'payee' ? 'selected' : ''}>Payée</option>
+            <option value="attente" ${v?.statut === 'attente' ? 'selected' : ''}>En attente de paiement</option>
+            <option value="annulee" ${v?.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
+          </select></div>
+      </div>
+
+      <div class="card-h"><div><h3>Articles vendus</h3></div><div class="spacer"></div>
+        <button class="btn sm" id="addLine"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Ajouter une ligne</button></div>
+      <div class="lines" id="linesBox"></div>
+
+      <div class="form-grid" style="margin-top:18px">
+        <div class="field"><label for="fRemise">Remise accordée (€)</label>
+          <input class="inp" id="fRemise" type="number" min="0" step="0.5" value="${v?.remise || 0}"></div>
+        <div class="field"><label for="fNotes">Note interne</label>
+          <input class="inp" id="fNotes" type="text" placeholder="Livrée en main propre…" value="${esc(v?.notes || '')}"></div>
+      </div>
+
+      <div class="totals" id="totalsBox"></div>
+    </div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveVente">${v ? 'Enregistrer les modifications' : 'Enregistrer la vente'}</button></div>
+  </div>`);
+
+  renderLines('vente');
+  $('#addLine').onclick = () => { draft.lignes.push({ produitId: prods[0].id, qte: 1, prix: Number(prods[0].prixRef) || 0 }); renderLines('vente'); };
+  $('#fRemise').oninput = () => paintTotals('vente');
+  $('#saveVente').onclick = async () => {
+    if (!draft.lignes.length) return toast('Ajoutez au moins un article.', 'er');
+    const rec = {
+      id: v?.id || uid(),
+      clientId: $('#fClient').value || null,
+      date: $('#fDate').value || today(),
+      moyen: $('#fMoyen').value,
+      statut: $('#fStatut').value,
+      remise: Math.max(0, parseFloat($('#fRemise').value) || 0),
+      notes: $('#fNotes').value.trim(),
+      lignes: draft.lignes.map(l => ({ produitId: l.produitId, qte: +l.qte, prix: +l.prix })),
+      createdAt: v?.createdAt || new Date().toISOString()
+    };
+    if (v) S.db.ventes[S.db.ventes.findIndex(x => x.id === v.id)] = rec;
+    else S.db.ventes.push(rec);
+    if (await API.saveVente(rec) === null) return;
+    if (rec.clientId) {
+      const c = S.db.clients.find(x => x.id === rec.clientId);
+      if (c && c.statut === 'prospect') { c.statut = 'client'; await API.saveClient(c); }
+    }
+    closeModal(); await recharger();
+    toast(v ? 'Vente mise à jour.' : `Vente de ${eur(Calc.totalVente(rec))} enregistrée.`);
+  };
+}
+
+/* ---------- Modale COMMANDE ---------- */
+function modalCmd(id) {
+  const prods = S.db.produits.filter(p => p.actif !== false);
+  if (!prods.length) { toast('Créez d’abord un produit au catalogue.', 'er'); return go('catalogue'); }
+  const c = id ? S.db.commandes.find(x => x.id === id) : null;
+  draft = { lignes: c ? c.lignes.map(l => ({ ...l })) : [{ produitId: prods[0].id, qte: 50, cout: Number(prods[0].coutRef) || 0 }] };
+
+  openModal(`<div class="sheet wide">
+    <div class="sheet-h">
+      <div><h2>${c ? 'Modifier la commande' : 'Nouvelle commande fournisseur'}</h2>
+        <p>Les frais de port sont répartis au prorata pour obtenir le coût de revient réel.</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="sheet-b">
+      <div class="form-grid" style="margin-bottom:18px">
+        <div class="field"><label for="fFour">Fournisseur</label>
+          <input class="inp" id="fFour" type="text" placeholder="Alibaba — Shenzhen Tech" value="${esc(c?.fournisseur || '')}"></div>
+        <div class="field"><label for="fDate">Date de commande</label>
+          <input class="inp" id="fDate" type="date" value="${c?.date || today()}"></div>
+        <div class="field"><label for="fStatut">Statut</label>
+          <select class="inp" id="fStatut">
+            <option value="commandee" ${(c?.statut || 'commandee') === 'commandee' ? 'selected' : ''}>Commandée</option>
+            <option value="transit" ${c?.statut === 'transit' ? 'selected' : ''}>En transit</option>
+            <option value="recue" ${c?.statut === 'recue' ? 'selected' : ''}>Reçue — entre en stock</option>
+            <option value="annulee" ${c?.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
+          </select>
+          <span class="hint">Le stock n'est mis à jour qu'au statut « Reçue ».</span></div>
+        <div class="field"><label for="fFrais">Frais de port et douane (€)</label>
+          <input class="inp" id="fFrais" type="number" min="0" step="0.5" value="${c?.frais || 0}"></div>
+      </div>
+
+      <div class="card-h"><div><h3>Articles commandés</h3></div><div class="spacer"></div>
+        <button class="btn sm" id="addLine"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Ajouter une ligne</button></div>
+      <div class="lines" id="linesBox"></div>
+
+      <div class="field" style="margin-top:18px"><label for="fNotes">Note</label>
+        <input class="inp" id="fNotes" type="text" placeholder="Numéro de suivi, délai annoncé…" value="${esc(c?.notes || '')}"></div>
+
+      <div class="totals" id="totalsBox"></div>
+    </div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveCmd">${c ? 'Enregistrer les modifications' : 'Enregistrer la commande'}</button></div>
+  </div>`);
+
+  renderLines('cmd');
+  $('#addLine').onclick = () => { draft.lignes.push({ produitId: prods[0].id, qte: 50, cout: Number(prods[0].coutRef) || 0 }); renderLines('cmd'); };
+  $('#fFrais').oninput = () => paintTotals('cmd');
+  $('#saveCmd').onclick = async () => {
+    if (!draft.lignes.length) return toast('Ajoutez au moins une ligne.', 'er');
+    if (!$('#fFour').value.trim()) { $('#fFour').classList.add('err'); return toast('Indiquez le fournisseur.', 'er'); }
+    const rec = {
+      id: c?.id || uid(), fournisseur: $('#fFour').value.trim(), date: $('#fDate').value || today(),
+      statut: $('#fStatut').value, frais: Math.max(0, parseFloat($('#fFrais').value) || 0),
+      notes: $('#fNotes').value.trim(),
+      lignes: draft.lignes.map(l => ({ produitId: l.produitId, qte: +l.qte, cout: +l.cout })),
+      createdAt: c?.createdAt || new Date().toISOString()
+    };
+    if (c) S.db.commandes[S.db.commandes.findIndex(x => x.id === c.id)] = rec;
+    else S.db.commandes.push(rec);
+    if (await API.saveCommande(rec) === null) return;
+    closeModal(); await recharger();
+    toast(c ? 'Commande mise à jour.' : `Commande de ${eur(Calc.totalCommande(rec))} enregistrée.`);
+  };
+}
+
+/* ---------- Modale CLIENT ---------- */
+function modalClient(id) {
+  const c = id ? S.db.clients.find(x => x.id === id) : null;
+  openModal(`<div class="sheet">
+    <div class="sheet-h"><div><h2>${c ? 'Modifier le client' : 'Nouveau client'}</h2>
+      <p>Un commerce démarché ou déjà équipé.</p></div><div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b"><div class="form-grid">
+      <div class="field full"><label for="cNom">Nom du commerce</label>
+        <input class="inp" id="cNom" type="text" placeholder="Le Comptoir des Halles" value="${esc(c?.nom || '')}"></div>
+      <div class="field"><label for="cContact">Personne à contacter</label>
+        <input class="inp" id="cContact" type="text" placeholder="Marie Dubois" value="${esc(c?.contact || '')}"></div>
+      <div class="field"><label for="cVille">Ville</label>
+        <input class="inp" id="cVille" type="text" placeholder="La Rochelle" value="${esc(c?.ville || '')}"></div>
+      <div class="field"><label for="cTel">Téléphone</label>
+        <input class="inp" id="cTel" type="tel" placeholder="06 12 34 56 78" value="${esc(c?.tel || '')}"></div>
+      <div class="field"><label for="cMail">E-mail</label>
+        <input class="inp" id="cMail" type="email" placeholder="contact@commerce.fr" value="${esc(c?.email || '')}"></div>
+      <div class="field"><label for="cStatut">Statut</label>
+        <select class="inp" id="cStatut">
+          <option value="prospect" ${(c?.statut || 'prospect') === 'prospect' ? 'selected' : ''}>Prospect</option>
+          <option value="client" ${c?.statut === 'client' ? 'selected' : ''}>Client</option>
+          <option value="inactif" ${c?.statut === 'inactif' ? 'selected' : ''}>Inactif</option>
+        </select></div>
+      <div class="field"><label for="cSecteur">Secteur d'activité</label>
+        <input class="inp" id="cSecteur" type="text" placeholder="Restauration" value="${esc(c?.secteur || '')}"></div>
+      <div class="field full"><label for="cNotes">Notes</label>
+        <textarea class="inp" id="cNotes" placeholder="Relancer début septembre, intéressé par 3 plaques…">${esc(c?.notes || '')}</textarea></div>
+    </div></div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveClient">${c ? 'Enregistrer' : 'Créer le client'}</button></div>
+  </div>`);
+
+  $('#saveClient').onclick = async () => {
+    const nom = $('#cNom').value.trim();
+    if (!nom) { $('#cNom').classList.add('err'); return toast('Indiquez le nom du commerce.', 'er'); }
+    const rec = {
+      id: c?.id || uid(), nom, contact: $('#cContact').value.trim(), ville: $('#cVille').value.trim(),
+      tel: $('#cTel').value.trim(), email: $('#cMail').value.trim(), statut: $('#cStatut').value,
+      secteur: $('#cSecteur').value.trim(), notes: $('#cNotes').value.trim(),
+      createdAt: c?.createdAt || new Date().toISOString()
+    };
+    if (c) S.db.clients[S.db.clients.findIndex(x => x.id === c.id)] = rec;
+    else S.db.clients.push(rec);
+    if (await API.saveClient(rec) === null) return;
+    closeModal(); await recharger();
+    toast(c ? 'Client mis à jour.' : `${nom} ajouté à vos clients.`);
+  };
+}
+
+/* ---------- Modale PRODUIT ---------- */
+function modalProduit(id) {
+  const p = id ? S.db.produits.find(x => x.id === id) : null;
+  openModal(`<div class="sheet">
+    <div class="sheet-h"><div><h2>${p ? 'Modifier le produit' : 'Nouveau produit'}</h2>
+      <p>Une référence de votre catalogue NFC.</p></div><div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b"><div class="form-grid">
+      <div class="field full"><label for="pNom">Nom du produit</label>
+        <input class="inp" id="pNom" type="text" placeholder="Plaque NFC comptoir" value="${esc(p?.nom || '')}"></div>
+      <div class="field"><label for="pRef">Référence</label>
+        <input class="inp" id="pRef" type="text" placeholder="PLQ-01" value="${esc(p?.ref || '')}"></div>
+      <div class="field"><label for="pSeuil">Seuil d'alerte stock</label>
+        <input class="inp" id="pSeuil" type="number" min="0" step="1" value="${p?.seuil ?? 10}"></div>
+      <div class="field"><label for="pCout">Coût d'achat de référence (€)</label>
+        <input class="inp" id="pCout" type="number" min="0" step="0.01" value="${p?.coutRef ?? 0}">
+        <span class="hint">Sert tant qu'aucune commande n'a été réceptionnée.</span></div>
+      <div class="field"><label for="pPrix">Prix de vente conseillé (€)</label>
+        <input class="inp" id="pPrix" type="number" min="0" step="0.5" value="${p?.prixRef ?? 0}"></div>
+      <div class="full sw-row"><div class="t"><b>Produit actif</b><span>Les produits inactifs restent dans l'historique mais disparaissent des formulaires</span></div>
+        <div class="sw ${p?.actif !== false ? 'on' : ''}" id="pActif"></div></div>
+    </div></div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveProduit">${p ? 'Enregistrer' : 'Créer le produit'}</button></div>
+  </div>`);
+
+  $('#pActif').onclick = e => e.currentTarget.classList.toggle('on');
+  $('#saveProduit').onclick = async () => {
+    const nom = $('#pNom').value.trim();
+    if (!nom) { $('#pNom').classList.add('err'); return toast('Indiquez le nom du produit.', 'er'); }
+    const rec = {
+      id: p?.id || uid(), nom, ref: $('#pRef').value.trim(),
+      seuil: Math.max(0, parseInt($('#pSeuil').value) || 0),
+      coutRef: Math.max(0, parseFloat($('#pCout').value) || 0),
+      prixRef: Math.max(0, parseFloat($('#pPrix').value) || 0),
+      actif: $('#pActif').classList.contains('on')
+    };
+    if (p) S.db.produits[S.db.produits.findIndex(x => x.id === p.id)] = rec;
+    else S.db.produits.push(rec);
+    if (await API.saveProduit(rec) === null) return;
+    closeModal(); await recharger();
+    toast(p ? 'Produit mis à jour.' : `${nom} ajouté au catalogue.`);
+  };
+}
+
+/* ---------- Modale CHARGE ---------- */
+function modalCharge(id) {
+  const c = id ? S.db.charges.find(x => x.id === id) : null;
+  openModal(`<div class="sheet narrow">
+    <div class="sheet-h"><div><h2>${c ? 'Modifier la charge' : 'Nouvelle charge'}</h2></div><div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b"><div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label for="hLib">Libellé</label>
+        <input class="inp" id="hLib" type="text" placeholder="Publicité Facebook — août" value="${esc(c?.libelle || '')}"></div>
+      <div class="field"><label for="hCat">Catégorie</label>
+        <select class="inp" id="hCat">${CAT_CHARGES.map(x => `<option ${c?.categorie === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      <div class="field"><label for="hMont">Montant (€)</label>
+        <input class="inp" id="hMont" type="number" min="0" step="0.01" value="${c?.montant || ''}"></div>
+      <div class="field"><label for="hDate">Date</label>
+        <input class="inp" id="hDate" type="date" value="${c?.date || today()}"></div>
+    </div></div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveCharge">${c ? 'Enregistrer' : 'Ajouter la charge'}</button></div>
+  </div>`);
+
+  $('#saveCharge').onclick = async () => {
+    const lib = $('#hLib').value.trim(), m = parseFloat($('#hMont').value) || 0;
+    if (!lib) { $('#hLib').classList.add('err'); return toast('Indiquez un libellé.', 'er'); }
+    if (m <= 0) { $('#hMont').classList.add('err'); return toast('Indiquez un montant.', 'er'); }
+    const rec = { id: c?.id || uid(), libelle: lib, categorie: $('#hCat').value, montant: m, date: $('#hDate').value || today() };
+    if (c) S.db.charges[S.db.charges.findIndex(x => x.id === c.id)] = rec;
+    else S.db.charges.push(rec);
+    if (await API.saveCharge(rec) === null) return;
+    closeModal(); await recharger(); toast(c ? 'Charge mise à jour.' : 'Charge enregistrée.');
+  };
+}
+
+/* ---------- Fiches détail ---------- */
+function detailVente(id) {
+  const v = S.db.ventes.find(x => x.id === id); if (!v) return;
+  const nm = clientName(v.clientId);
+  openModal(`<div class="sheet">
+    <div class="sheet-h">
+      <div class="bub" style="width:38px;height:38px;border-radius:12px;background:${hueFor(nm)}">${initials(nm)}</div>
+      <div><h2>${esc(nm)}</h2><p>Vente du ${dfr(v.date)} · ${esc(v.moyen || 'paiement non précisé')}</p></div>
+      <div class="spacer"></div>${statutVentePill(v.statut)}
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b">
+      <table><thead><tr><th class="nos">Article</th><th class="nos num">Qté</th><th class="nos num">P.U.</th>
+        <th class="nos num">Coût</th><th class="nos num">Total</th></tr></thead>
+        <tbody>${v.lignes.map(l => `<tr>
+          <td class="str">${esc(produitName(l.produitId))}</td>
+          <td class="num">${l.qte}</td><td class="num">${eur(l.prix)}</td>
+          <td class="num" style="color:var(--ink-3)">${eur(l.qte * Calc.pmp(l.produitId))}</td>
+          <td class="num str">${eur(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table>
+      ${v.notes ? `<div class="alert b" style="margin-top:15px"><svg viewBox="0 0 24 24"><use href="#i-info"/></svg>
+        <div class="t"><b>Note</b><span>${esc(v.notes)}</span></div></div>` : ''}
+      <div class="totals">
+        ${v.remise ? `<div class="trow"><span>Remise</span><b style="color:#FF9E80">−${eur(v.remise)}</b></div>` : ''}
+        <div class="trow"><span>Coût de revient</span><b style="color:var(--ink-3)">${eur(Calc.coutVente(v))}</b></div>
+        <div class="trow mg"><span>Marge</span><b>${eur(Calc.margeVente(v))}</b></div>
+        <div class="trow big"><span>Total</span><b>${eur(Calc.totalVente(v))}</b></div>
+      </div>
+    </div>
+    <div class="sheet-f">
+      <button class="btn dgr" data-act="delVente:${v.id}"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg>Supprimer</button>
+      <div class="spacer"></div>
+      ${v.statut === 'attente' ? `<button class="btn suc" data-act="payer:${v.id}"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg>Marquer payée</button>` : ''}
+      <button class="btn pri" data-act="editVente:${v.id}">Modifier</button></div>
+  </div>`);
+}
+
+function detailClient(id) {
+  const c = S.db.clients.find(x => x.id === id); if (!c) return;
+  const vs = S.db.ventes.filter(v => v.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date));
+  const ca = Calc.caClient(c.id);
+  const mg = vs.filter(v => v.statut !== 'annulee').reduce((s, v) => s + Calc.margeVente(v), 0);
+  openModal(`<div class="sheet">
+    <div class="sheet-h">
+      <div class="bub" style="width:40px;height:40px;border-radius:13px;background:${hueFor(c.nom)}">${initials(c.nom)}</div>
+      <div><h2>${esc(c.nom)}</h2><p>${esc([c.secteur, c.ville].filter(Boolean).join(' · ') || 'Aucune information complémentaire')}</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b">
+      <div class="grid g3" style="gap:11px;margin-bottom:18px">
+        <div class="glass" style="padding:13px"><div class="kpi-lbl" style="font-size:10px">CA généré</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:4px">${eur(ca)}</div></div>
+        <div class="glass" style="padding:13px"><div class="kpi-lbl" style="font-size:10px">Marge</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:4px;color:#6EE787">${eur(mg)}</div></div>
+        <div class="glass" style="padding:13px"><div class="kpi-lbl" style="font-size:10px">Commandes</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:4px">${vs.filter(v => v.statut !== 'annulee').length}</div></div>
+      </div>
+      ${(c.contact || c.tel || c.email) ? `<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px">
+        ${c.contact ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-user"/></svg>${esc(c.contact)}</span>` : ''}
+        ${c.tel ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-phone"/></svg>${esc(c.tel)}</span>` : ''}
+        ${c.email ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-mail"/></svg>${esc(c.email)}</span>` : ''}
+      </div>` : ''}
+      ${c.notes ? `<div class="alert b" style="margin-bottom:18px"><svg viewBox="0 0 24 24"><use href="#i-info"/></svg>
+        <div class="t"><b>Notes</b><span>${esc(c.notes)}</span></div></div>` : ''}
+      <div class="card-h"><div><h3>Historique d'achat</h3></div></div>
+      ${vs.length ? `<table><thead><tr><th class="nos">Date</th><th class="nos">Articles</th>
+        <th class="nos">Statut</th><th class="nos num">Total</th></tr></thead>
+        <tbody>${vs.map(v => `<tr data-open="vente:${v.id}" style="cursor:pointer">
+          <td style="color:var(--ink-3)">${dfr(v.date)}</td>
+          <td style="font-size:12.5px">${v.lignes.map(l => `${l.qte}× ${esc(produitName(l.produitId))}`).join(', ')}</td>
+          <td>${statutVentePill(v.statut)}</td>
+          <td class="num str">${eur(Calc.totalVente(v))}</td></tr>`).join('')}</tbody></table>`
+        : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Aucune vente enregistrée pour ce client</div>`}
+    </div>
+    <div class="sheet-f">
+      <button class="btn" data-act="editClient:${c.id}"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg>Modifier</button>
+      <div class="spacer"></div>
+      <button class="btn pri" data-act="venteFor:${c.id}"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle vente</button></div>
+  </div>`);
+}
+
+/* ============================================================================
+   EXPORTS
+   ============================================================================ */
+function download(name, content, type = 'text/csv;charset=utf-8;') {
+  const blob = new Blob(['\ufeff' + content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  toast(`${name} téléchargé.`);
+}
+const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+const csv = rows => rows.map(r => r.map(csvCell).join(';')).join('\r\n');
+
+function exportVentes() {
+  const rows = [['Date', 'Client', 'Ville', 'Articles', 'Quantité', 'Moyen de paiement', 'Statut', 'Remise', 'Coût de revient', 'Marge', 'Total']];
+  for (const v of [...S.db.ventes].sort((a, b) => a.date.localeCompare(b.date))) {
+    const c = S.db.clients.find(x => x.id === v.clientId);
+    rows.push([v.date, clientName(v.clientId), c?.ville || '', v.lignes.map(l => `${l.qte}x ${produitName(l.produitId)}`).join(' + '),
+      v.lignes.reduce((s, l) => s + l.qte, 0), v.moyen || '', v.statut, v.remise || 0,
+      rnd(Calc.coutVente(v)), rnd(Calc.margeVente(v)), rnd(Calc.totalVente(v))]);
+  }
+  download(`ventes-${today()}.csv`, csv(rows));
+}
+function exportCmd() {
+  const rows = [['Date', 'Fournisseur', 'Articles', 'Quantité', 'Frais', 'Statut', 'Total']];
+  for (const c of [...S.db.commandes].sort((a, b) => a.date.localeCompare(b.date)))
+    rows.push([c.date, c.fournisseur, c.lignes.map(l => `${l.qte}x ${produitName(l.produitId)}`).join(' + '),
+      c.lignes.reduce((s, l) => s + l.qte, 0), c.frais || 0, c.statut, rnd(Calc.totalCommande(c))]);
+  download(`commandes-${today()}.csv`, csv(rows));
+}
+function exportClients() {
+  const rows = [['Nom', 'Contact', 'Ville', 'Téléphone', 'E-mail', 'Secteur', 'Statut', 'Nb ventes', 'CA généré', 'Notes']];
+  for (const c of S.db.clients)
+    rows.push([c.nom, c.contact || '', c.ville || '', c.tel || '', c.email || '', c.secteur || '', c.statut || '',
+      S.db.ventes.filter(v => v.clientId === c.id && v.statut !== 'annulee').length, rnd(Calc.caClient(c.id)), c.notes || '']);
+  download(`clients-${today()}.csv`, csv(rows));
+}
+function exportGlobal() {
+  download(`scanavis-${today()}.json`, JSON.stringify({
+    export: new Date().toISOString(), compte: { nom: S.user.name, email: S.user.email }, donnees: S.db
+  }, null, 2), 'application/json');
+}
+
+/* ============================================================================
+   JEU DE DÉMONSTRATION
+   ============================================================================ */
+async function seedDemo() {
+  const u = S.user.id;
+  const P = S.db.produits;
+  if (P.length < 3) return toast('Ajoutez au moins trois produits au catalogue.', 'er');
+
+  const commerces = [['Le Comptoir des Halles', 'La Rochelle', 'Restauration'], ['Coiffure Éclat', 'Bordeaux', 'Beauté'],
+    ['Garage Moreau', 'Dax', 'Automobile'], ['Boulangerie Saint-Jean', 'La Rochelle', 'Alimentation'],
+    ['Pizzeria Vesuvio', 'Bordeaux', 'Restauration'], ['Institut Zen', 'Angoulême', 'Bien-être'],
+    ['Fleurs & Sens', 'Niort', 'Commerce'], ['Auto-école Cap Sud', 'La Rochelle', 'Formation']];
+
+  const { data: clients, error: e1 } = await sb.from('clients').insert(
+    commerces.map((c, i) => ({ user_id: u, nom: c[0], ville: c[1], secteur: c[2], statut: i < 6 ? 'client' : 'prospect' }))
+  ).select();
+  if (boum(e1)) return;
+
+  const now = new Date();
+  const iso = d => d.toISOString().slice(0, 10);
+
+  const cmdRows = [];
+  for (let m = 6; m >= 0; m -= 2) {
+    cmdRows.push({
+      user_id: u, fournisseur: 'Shenzhen NFC Tech',
+      date: iso(new Date(now.getFullYear(), now.getMonth() - m, 8)),
+      statut: m === 0 ? 'transit' : 'recue', frais: 45 + m * 3,
+      date_reception: m === 0 ? null : iso(new Date(now.getFullYear(), now.getMonth() - m, 22)),
+      _m: m
+    });
+  }
+  const { data: cmds, error: e2 } = await sb.from('commandes')
+    .insert(cmdRows.map(({ _m, ...r }) => r)).select();
+  if (boum(e2)) return;
+
+  const cLignes = [];
+  cmds.forEach((c, i) => {
+    const m = cmdRows[i]._m;
+    cLignes.push(
+      { commande_id: c.id, user_id: u, produit_id: P[0].id, qte: 40, cout: 3.1 + m * 0.05 },
+      { commande_id: c.id, user_id: u, produit_id: P[1].id, qte: 80, cout: 1.75 },
+      { commande_id: c.id, user_id: u, produit_id: P[2].id, qte: 60, cout: 1.05 });
+  });
+  if (boum((await sb.from('commande_lignes').insert(cLignes)).error)) return;
+
+  const MOYENS = ['Espèces', 'Virement', 'Carte bancaire', 'PayPal'];
+  const vRows = [], vMeta = [];
+  for (let m = 5; m >= 0; m--) {
+    const n = 3 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < n; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - m, 2 + Math.floor(Math.random() * 25));
+      if (d > now) continue;
+      const p = P[Math.floor(Math.random() * 3)];
+      vRows.push({
+        user_id: u, client_id: clients[Math.floor(Math.random() * 6)].id, date: iso(d),
+        moyen: MOYENS[Math.floor(Math.random() * MOYENS.length)],
+        statut: Math.random() > 0.88 ? 'attente' : 'payee',
+        remise: Math.random() > 0.8 ? 5 : 0
+      });
+      vMeta.push({ produit_id: p.id, qte: 1 + Math.floor(Math.random() * 3), prix: Number(p.prixRef) });
+    }
+  }
+  const { data: ventes, error: e3 } = await sb.from('ventes').insert(vRows).select();
+  if (boum(e3)) return;
+  if (boum((await sb.from('vente_lignes').insert(
+    ventes.map((v, i) => ({ vente_id: v.id, user_id: u, ...vMeta[i] }))).error))) return;
+
+  if (boum((await sb.from('charges').insert([
+    { user_id: u, libelle: 'Publicité Facebook', categorie: 'Publicité', montant: 120, date: today() },
+    { user_id: u, libelle: 'Carburant tournée commerciale', categorie: 'Déplacements', montant: 68.4, date: today() },
+    { user_id: u, libelle: 'Abonnement Canva Pro', categorie: 'Logiciels', montant: 11.99, date: today() }
+  ])).error)) return;
+
+  await recharger();
+  toast('Jeu de démonstration chargé.');
+}
+
+/* ============================================================================
+   ÉVÉNEMENTS
+   ============================================================================ */
+const ACTIONS = {
+  newVente: () => modalVente(),
+  newCmd: () => modalCmd(),
+  newClient: () => modalClient(),
+  newProduit: () => modalProduit(),
+  newCharge: () => modalCharge(),
+  editVente: id => modalVente(id),
+  editCmd: id => modalCmd(id),
+  editClient: id => modalClient(id),
+  editProduit: id => modalProduit(id),
+  editCharge: id => modalCharge(id),
+  venteFor: id => modalVente(null, id),
+  exportVentes, exportCmd, exportClients, exportGlobal, seedDemo,
+  logout: async () => { if (await confirmer('Se déconnecter', 'Vous devrez saisir à nouveau votre mot de passe pour revenir.', 'Se déconnecter', false)) logout(); },
+
+  payer: async id => {
+    const v = S.db.ventes.find(x => x.id === id); if (!v) return;
+    if (!await API.patchVente(id, { statut: 'payee' })) return;
+    closeModal(); await recharger();
+    toast(`${eur(Calc.totalVente(v))} encaissés.`);
+  },
+  receptionner: async id => {
+    const c = S.db.commandes.find(x => x.id === id); if (!c) return;
+    const u = c.lignes.reduce((s, l) => s + l.qte, 0);
+    if (!await confirmer('Réceptionner la commande', `${u} unités vont entrer en stock et le coût de revient sera recalculé.`, 'Réceptionner', false)) return;
+    if (!await API.patchCommande(id, { statut: 'recue', date_reception: today() })) return;
+    await recharger(); toast(`${u} unités entrées en stock.`);
+  },
+  delVente: async id => {
+    if (!await confirmer('Supprimer la vente', 'Cette vente sera retirée de vos statistiques et les articles reviendront en stock.')) return;
+    if (!await API.supprimer('ventes', id)) return;
+    closeModal(); await recharger(); toast('Vente supprimée.');
+  },
+  delCmd: async id => {
+    if (!await confirmer('Supprimer la commande', 'Le stock et le coût de revient seront recalculés sans cette commande.')) return;
+    if (!await API.supprimer('commandes', id)) return;
+    closeModal(); await recharger(); toast('Commande supprimée.');
+  },
+  delClient: async id => {
+    const nb = S.db.ventes.filter(v => v.clientId === id).length;
+    if (!await confirmer('Supprimer le client', nb ? `${nb} vente(s) resteront enregistrées mais ne seront plus rattachées à ce client.` : 'Ce client sera définitivement retiré de votre liste.')) return;
+    if (!await API.supprimer('clients', id)) return;
+    closeModal(); await recharger(); toast('Client supprimé.');
+  },
+  delProduit: async id => {
+    const used = S.db.ventes.some(v => v.lignes.some(l => l.produitId === id)) || S.db.commandes.some(c => c.lignes.some(l => l.produitId === id));
+    if (used) {
+      if (!await confirmer('Produit utilisé', 'Ce produit apparaît dans votre historique. Le désactiver le retire des formulaires tout en gardant vos statistiques intactes.', 'Désactiver', false)) return;
+      const p = S.db.produits.find(x => x.id === id); p.actif = false;
+      if (await API.saveProduit(p) === null) return;
+      await recharger(); return toast('Produit désactivé.');
+    }
+    if (!await confirmer('Supprimer le produit', 'Cette référence sera définitivement retirée du catalogue.')) return;
+    if (!await API.supprimer('produits', id)) return;
+    await recharger(); toast('Produit supprimé.');
+  },
+  delCharge: async id => {
+    if (!await confirmer('Supprimer la charge', 'Cette écriture sera retirée de votre résultat.')) return;
+    if (!await API.supprimer('charges', id)) return;
+    await recharger(); toast('Charge supprimée.');
+  },
+  editObj: () => {
+    openModal(`<div class="sheet narrow">
+      <div class="sheet-h"><div><h2>Objectif mensuel</h2><p>Affiché sur votre tableau de bord.</p></div><div class="spacer"></div>
+        <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+      <div class="sheet-b"><div class="field"><label for="oVal">Chiffre d'affaires visé chaque mois (€)</label>
+        <input class="inp" id="oVal" type="number" min="0" step="50" value="${S.db.settings.objectif}"></div></div>
+      <div class="sheet-f"><div class="spacer"></div><button class="btn" data-close>Annuler</button>
+        <button class="btn pri" id="oSave">Enregistrer</button></div></div>`);
+    $('#oSave').onclick = async () => {
+      S.db.settings.objectif = Math.max(0, parseFloat($('#oVal').value) || 0);
+      if (!await API.saveParametres(S.db.settings)) return;
+      closeModal(); render(); toast('Objectif mis à jour.');
+    };
+  },
+  saveObj: async () => {
+    S.db.settings.objectif = Math.max(0, parseFloat($('#setObj').value) || 0);
+    if (!await API.saveParametres(S.db.settings)) return;
+    toast('Objectif enregistré.');
+  },
+  toggle: async key => {
+    S.db.settings[key] = !S.db.settings[key];
+    if (!await API.saveParametres(S.db.settings)) return;
+    render();
+  },
+  clearFilters: view => { S.filters[view] = {}; S.search = ''; $('#globalSearch').value = ''; render(); },
+  resetData: async () => {
+    if (!await confirmer('Effacer toutes vos données', 'Ventes, commandes, clients, produits et charges seront définitivement supprimés. Cette action est irréversible.', 'Tout effacer')) return;
+    if (!await API.reinitialiser()) return;
+    await recharger(); go('dash'); toast('Données effacées.');
+  },
+  reloadAdmin: async () => { await loadAdmin(); render(); toast('Comptes actualisés.'); },
+  toggleUser: async id => {
+    const u = S.allUsers.find(x => x.id === id); if (!u) return;
+    const off = u.actif === false;
+    if (!await confirmer(off ? 'Réactiver le compte' : 'Désactiver le compte',
+      off ? `${u.name} pourra à nouveau se connecter.` : `${u.name} ne pourra plus se connecter ni lire ses données. Rien n'est supprimé.`,
+      off ? 'Réactiver' : 'Désactiver', !off)) return;
+    const { error } = await sb.rpc('admin_basculer_compte', { cible: id, nouvel_etat: off });
+    if (boum(error)) return;
+    await loadAdmin(); render();
+    toast(off ? 'Compte réactivé.' : 'Compte désactivé.');
+  },
+  delUser: async id => {
+    const u = S.allUsers.find(x => x.id === id); if (!u) return;
+    if (!await confirmer('Purger les données du compte',
+      `Toutes les ventes, commandes, clients et charges de ${u.name} seront définitivement supprimés. Le compte de connexion, lui, est conservé — sa suppression définitive se fait depuis Supabase > Authentication.`,
+      'Purger les données')) return;
+    const { error } = await sb.rpc('admin_purger_compte', { cible: id });
+    if (boum(error)) return;
+    await loadAdmin(); render(); toast('Données du compte purgées.');
+  }
+};
+
+function runAction(raw) {
+  const [name, arg] = raw.split(':');
+  const fn = ACTIONS[name];
+  if (fn) fn(arg);
+}
+
+function wireModal() {
+  $$('#scrim [data-close]').forEach(b => b.onclick = closeModal);
+  $$('#scrim [data-act]').forEach(b => b.onclick = e => { e.stopPropagation(); runAction(b.dataset.act); });
+  $$('#scrim [data-open]').forEach(el => el.onclick = e => {
+    e.stopPropagation();
+    const [k, id] = el.dataset.open.split(':');
+    (k === 'vente' ? detailVente : detailClient)(id);
+  });
+}
+
+function wire() {
+  $$('#main [data-act]').forEach(b => b.onclick = e => { e.stopPropagation(); runAction(b.dataset.act); });
+  $$('#main [data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+  $$('#main [data-open]').forEach(el => el.onclick = e => {
+    e.stopPropagation();
+    const [k, id] = el.dataset.open.split(':');
+    (k === 'vente' ? detailVente : detailClient)(id);
+  });
+  $$('#main [data-sort]').forEach(el => el.onclick = () => {
+    const [view, key] = el.dataset.sort.split(':');
+    const st = sortState(view);
+    if (st.key === key) st.dir *= -1; else { st.key = key; st.dir = key === 'date' ? -1 : 1; }
+    render();
+  });
+  $$('#main [data-filter]').forEach(el => el.onchange = () => {
+    const [view, key] = el.dataset.filter.split(':');
+    (S.filters[view] || (S.filters[view] = {}))[key] = el.value;
+    render();
+  });
+  $$('#main [data-save]').forEach(el => el.onchange = async () => {
+    S.db.settings[el.dataset.save] = parseFloat(el.value) || 0; await API.saveParametres(S.db.settings);
+  });
+  const seg = $('#periodSeg');
+  if (seg) seg.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; render(); });
+}
+
+/* ============================================================================
+   DÉMARRAGE
+   ============================================================================ */
+$('#authGo').onclick = submitAuth;
+['aMail', 'aPass', 'aName'].forEach(id => $('#' + id).addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); }));
+
+$('#globalSearch').addEventListener('input', e => {
+  S.search = e.target.value.trim();
+  if (['dash', 'params', 'admin', 'rapports'].includes(S.view)) S.view = 'ventes', buildNav();
+  render();
+});
+
+$('#userChip').onclick = () => go('params');
+$('#btnBell').onclick = () => {
+  const a = Calc.alertes();
+  if (!a.length) return toast('Rien à signaler, tout est à jour.', 'in');
+  openModal(`<div class="sheet narrow">
+    <div class="sheet-h"><div><h2>Alertes</h2><p>${a.length} point${a.length > 1 ? 's' : ''} à surveiller</p></div><div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b">${a.map(x => `<div class="alert ${x.n}">
+      <svg viewBox="0 0 24 24"><use href="#${x.n === 'b' ? 'i-info' : 'i-alert'}"/></svg>
+      <div class="t"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></div></div>`).join('')}</div></div>`);
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#scrim')) return closeModal();
+  if (!S.user || $('#scrim') || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'v') { e.preventDefault(); modalVente(); }
+  else if (k === 'c') { e.preventDefault(); modalCmd(); }
+  else if (k === 'n') { e.preventDefault(); modalClient(); }
+  else if (k === '/') { e.preventDefault(); $('#globalSearch').focus(); }
+});
+
+/* l'écran Administration charge les comptes à la volée */
+const _go = go;
+go = function (view) {
+  _go(view);
+  if (view === 'admin' && S.user?.isAdmin) loadAdmin().then(render);
+};
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' && S.user) {
+    S.user = null; S.db = null;
+    $('#app').classList.add('hidden');
+    $('#authScreen').classList.remove('hidden');
+    authMode = 'login'; paintAuth();
+  }
+});
+
+(async function boot() {
+  paintAuth();
+  if (SUPABASE_URL.includes('VOTRE-REF') || !SUPABASE_KEY.startsWith('sb_')) {
+    $('#boot').innerHTML = `<div style="max-width:420px;text-align:center;padding:26px">
+      <div class="auth-mark"><svg viewBox="0 0 24 24"><use href="#i-set"/></svg></div>
+      <h1 style="font-size:20px;font-weight:680;margin-bottom:10px">Configuration requise</h1>
+      <p style="font-size:13.5px;color:var(--ink-3);line-height:1.6">Renseignez <span class="mono">SUPABASE_URL</span>
+      et <span class="mono">SUPABASE_KEY</span> en haut du fichier, puis exécutez
+      <span class="mono">schema.sql</span> dans l'éditeur SQL de Supabase.</p></div>`;
+    return;
+  }
+  if (!sb) return;                       // panne() a déjà affiché le message
+  try {
+    const { data: { session } } = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé')), 8000))
+    ]);
+    if (session) { $('#boot').classList.add('hidden'); await openSession(); return; }
+  } catch (e) { console.error('getSession', e); }
+  $('#boot').classList.add('hidden');
+  $('#authScreen').classList.remove('hidden');
+})();
+</script>
+
+</body>
+</html>
