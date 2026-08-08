@@ -882,7 +882,7 @@ function traduireErreur(m) {
    ============================================================================ */
 const toNum = v => Number(v) || 0;
 
-const Map = {
+const Convertir = {
   produit:  r => ({ id: r.id, nom: r.nom, ref: r.reference || '', coutRef: toNum(r.cout_ref), prixRef: toNum(r.prix_ref), seuil: r.seuil, actif: r.actif }),
   client:   r => ({ id: r.id, nom: r.nom, contact: r.contact || '', ville: r.ville || '', tel: r.tel || '', email: r.email || '', secteur: r.secteur || '', statut: r.statut, notes: r.notes || '', createdAt: r.created_at }),
   vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
@@ -917,20 +917,20 @@ const API = {
     const err = [prod, cli, ven, vli, cmd, cli2, chg, par].find(r => r.error);
     if (err) throw err.error;
 
-    const ventes = (ven.data || []).map(Map.vente);
+    const ventes = (ven.data || []).map(Convertir.vente);
     const iv = Object.fromEntries(ventes.map(v => [v.id, v]));
     for (const l of vli.data || []) iv[l.vente_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, prix: toNum(l.prix) });
 
-    const commandes = (cmd.data || []).map(Map.commande);
+    const commandes = (cmd.data || []).map(Convertir.commande);
     const ic = Object.fromEntries(commandes.map(c => [c.id, c]));
     for (const l of cli2.data || []) ic[l.commande_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, cout: toNum(l.cout) });
 
     const p = par.data || {};
     return {
-      produits: (prod.data || []).map(Map.produit),
-      clients: (cli.data || []).map(Map.client),
+      produits: (prod.data || []).map(Convertir.produit),
+      clients: (cli.data || []).map(Convertir.client),
       ventes, commandes,
-      charges: (chg.data || []).map(Map.charge),
+      charges: (chg.data || []).map(Convertir.charge),
       settings: {
         objectif: toNum(p.objectif ?? 3000), devise: 'EUR',
         alertesStock: p.alertes_stock ?? true,
