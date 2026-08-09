@@ -576,6 +576,98 @@ select.inp option{background:#0B1B33;color:var(--ink)}
 .filters .inp{height:34px;width:auto;min-width:135px;font-size:12.5px}
 
 /* ============================================================
+   MODE CLAIR — verre blanc translucide
+   ============================================================ */
+html.clair{
+  --ink:#0A1626;
+  --ink-2:rgba(10,22,38,.70);
+  --ink-3:rgba(10,22,38,.48);
+  --ink-4:rgba(10,22,38,.28);
+  --stroke:rgba(10,22,38,.10);
+  --stroke-2:rgba(10,22,38,.16);
+  --shadow-sm:0 2px 8px rgba(10,22,38,.07);
+  --shadow-md:0 10px 30px rgba(10,22,38,.10);
+  --shadow-lg:0 26px 64px rgba(10,22,38,.18);
+}
+html.clair body,html.clair .boot{background:var(--bg-3)}
+html.clair .grain{opacity:.018}
+html.clair .orb{opacity:.5;filter:blur(90px)}
+
+html.clair .glass{
+  box-shadow:
+    0 14px 40px rgba(10,22,38,.10),
+    0 1px 3px rgba(10,22,38,.06),
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 1px 0 0 rgba(255,255,255,.5),
+    inset -1px 0 0 rgba(255,255,255,.5),
+    inset 0 -1px 0 rgba(10,22,38,.05);
+}
+html.clair .glass::before{
+  background:linear-gradient(115deg,transparent 26%,rgba(255,255,255,.5) 42%,rgba(255,255,255,.14) 54%,transparent 68%);
+}
+html.clair .topbar{background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.34))}
+html.clair .rail{background:linear-gradient(180deg,rgba(255,255,255,.58),rgba(255,255,255,.2))}
+html.clair .tabbar{background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.82))}
+html.clair .sheet,html.clair .auth-card{
+  background:linear-gradient(158deg,rgba(255,255,255,.93),rgba(255,255,255,.8) 50%,rgba(255,255,255,.88));
+  border-color:rgba(255,255,255,.9);
+  box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,1);
+}
+html.clair .sheet-f{background:rgba(10,22,38,.03)}
+html.clair .scrim{background:rgba(10,22,38,.26)}
+
+html.clair .btn{background:rgba(255,255,255,.66);border-color:rgba(10,22,38,.12)}
+html.clair .btn:hover{background:rgba(255,255,255,.92)}
+html.clair .btn.gho{background:transparent;border-color:transparent}
+html.clair .btn.gho:hover{background:rgba(10,22,38,.05)}
+html.clair .btn.pri{border-color:rgba(255,255,255,.5);color:#fff}
+html.clair .btn.dgr{background:rgba(255,69,58,.10);color:#C9271D}
+html.clair .btn.suc{background:rgba(50,215,75,.13);color:#1E7A2E}
+
+html.clair .search,html.clair .inp{background:rgba(255,255,255,.7);border-color:rgba(10,22,38,.12)}
+html.clair .inp:focus,html.clair .search:focus{background:#fff}
+html.clair select.inp{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A162699' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+html.clair select.inp option,html.clair .statut-sel option{background:#fff;color:#0A1626}
+html.clair .statut-sel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230A162680' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+html.clair .statut-sel.g{background-color:rgba(50,215,75,.16);color:#1B7A2C}
+html.clair .statut-sel.o{background-color:rgba(224,164,0,.18);color:#9A6B00}
+html.clair .statut-sel.b{background-color:rgba(46,139,255,.14);color:#1462C4}
+html.clair .statut-sel.n{background-color:rgba(10,22,38,.06);color:var(--ink-3)}
+
+html.clair thead th{color:rgba(10,22,38,.44)}
+html.clair tbody td{border-top-color:rgba(10,22,38,.08)}
+html.clair tbody tr:first-child td{border-top-color:rgba(10,22,38,.12)}
+html.clair tbody tr:hover{background:rgba(10,22,38,.035)}
+
+html.clair .seg{background:rgba(10,22,38,.05)}
+html.clair .seg button.on{background:#fff;color:#0A1626;box-shadow:0 2px 8px rgba(10,22,38,.12)}
+html.clair .sw{background:rgba(10,22,38,.16)}
+html.clair .chip{background:rgba(10,22,38,.05)}
+html.clair .kbd{background:rgba(10,22,38,.07)}
+html.clair .pbar{background:rgba(10,22,38,.10)}
+html.clair .line{background:rgba(255,255,255,.55)}
+html.clair .divider{background:rgba(10,22,38,.09)}
+html.clair .empty-ico{background:linear-gradient(150deg,rgba(255,255,255,.9),rgba(255,255,255,.5))}
+html.clair .toast{background:rgba(255,255,255,.94);border-color:rgba(10,22,38,.10)}
+html.clair .sw-col.on{border-color:#0A1626;box-shadow:0 0 0 3px rgba(10,22,38,.14)}
+html.clair .ring-bg{stroke:rgba(10,22,38,.10)}
+html.clair .gline{stroke:rgba(10,22,38,.08)}
+html.clair .glab{fill:rgba(10,22,38,.48)}
+html.clair .main::-webkit-scrollbar-thumb,
+html.clair .rail::-webkit-scrollbar-thumb{background:rgba(10,22,38,.2);background-clip:padding-box}
+
+html.clair .pill.g{background:rgba(50,215,75,.15);color:#1B7A2C}
+html.clair .pill.o{background:rgba(224,164,0,.18);color:#8A6000}
+html.clair .pill.r{background:rgba(255,69,58,.13);color:#B32219}
+html.clair .pill.b{background:rgba(46,139,255,.13);color:#1462C4}
+html.clair .pill.v{background:rgba(167,139,250,.18);color:#6234C9}
+html.clair .pill.n{background:rgba(10,22,38,.06);color:var(--ink-3)}
+html.clair .trend.up{background:rgba(50,215,75,.15);color:#1B7A2C}
+html.clair .trend.dn{background:rgba(255,69,58,.13);color:#B32219}
+html.clair .trend.fl{background:rgba(10,22,38,.06);color:var(--ink-3)}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media(max-width:1180px){
@@ -958,7 +1050,9 @@ const toNum = v => Number(v) || 0;
 
 const Convertir = {
   produit:  r => ({ id: r.id, nom: r.nom, ref: r.reference || '', coutRef: toNum(r.cout_ref), prixRef: toNum(r.prix_ref), seuil: r.seuil, actif: r.actif }),
-  client:   r => ({ id: r.id, nom: r.nom, contact: r.contact || '', ville: r.ville || '', tel: r.tel || '', email: r.email || '', secteur: r.secteur || '', statut: r.statut, notes: r.notes || '', createdAt: r.created_at }),
+  client:   r => ({ id: r.id, nom: r.nom, contact: r.contact || '', prenom: r.prenom || '', nomContact: r.nom_contact || '',
+    ville: r.ville || '', tel: r.tel || '', email: r.email || '', secteur: r.secteur || '', statut: r.statut,
+    notes: r.notes || '', createdAt: r.created_at }),
   vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
   commande: r => ({ id: r.id, fournisseur: r.fournisseur, date: r.date, statut: r.statut, frais: toNum(r.frais), notes: r.notes || '', dateReception: r.date_reception, createdAt: r.created_at, lignes: [] }),
   charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date }),
@@ -1087,8 +1181,11 @@ const API = {
 
   async saveClient(rec) {
     const { data, error } = await sb.from('clients').upsert({
-      id: rec.id, ...this.base(), nom: rec.nom, contact: rec.contact, ville: rec.ville,
-      tel: rec.tel, email: rec.email, secteur: rec.secteur, statut: rec.statut, notes: rec.notes
+      id: rec.id, ...this.base(), nom: rec.nom,
+      prenom: rec.prenom || '', nom_contact: rec.nomContact || '',
+      contact: [rec.prenom, rec.nomContact].filter(Boolean).join(' ').trim() || rec.contact || '',
+      ville: rec.ville, tel: rec.tel, email: rec.email,
+      secteur: rec.secteur, statut: rec.statut, notes: rec.notes
     }).select().single();
     return boum(error) ? null : data.id;
   },
@@ -1199,7 +1296,15 @@ const FONDS = {
   bordeaux: { n: 'Bordeaux', v: ['#4A1526', '#240A13', '#0D0407'] },
   cuivre:   { n: 'Cuivre',   v: ['#4A2A15', '#24140A', '#0D0704'] },
   basalte:  { n: 'Basalte',  v: ['#24262B', '#111214', '#060607'] },
-  encre:    { n: 'Encre',    v: ['#1E2A4A', '#0D1424', '#04070E'] }
+  encre:    { n: 'Encre',    v: ['#1E2A4A', '#0D1424', '#04070E'] },
+
+  /* clairs — verre blanc translucide */
+  brume:    { n: 'Brume',    v: ['#FFFFFF', '#EFF4FB', '#E4EBF5'], clair: true },
+  neige:    { n: 'Neige',    v: ['#FFFFFF', '#F7F8FA', '#EDEFF3'], clair: true },
+  azur:     { n: 'Azur',     v: ['#F2F8FF', '#E2EFFC', '#D3E5F8'], clair: true },
+  lin:      { n: 'Lin',      v: ['#FFFCF7', '#F6F1E8', '#EBE4D7'], clair: true },
+  sable:    { n: 'Sable',    v: ['#FFF9F4', '#F7EDE4', '#EDE0D3'], clair: true },
+  menthe:   { n: 'Menthe',   v: ['#F3FCF8', '#E3F5ED', '#D3ECE1'], clair: true }
 };
 
 const VERRES = {
@@ -1226,14 +1331,15 @@ function appliquerTheme(st) {
   r.setProperty('--accent-soft', a.soft);
   r.setProperty('--accent-deep', a.deep);
   const f = FONDS[st?.fond] || FONDS.marine;
+  document.documentElement.classList.toggle('clair', !!f.clair);
   r.setProperty('--bg-1', f.v[0]);
   r.setProperty('--bg-2', f.v[1]);
   r.setProperty('--bg-3', f.v[2]);
-  r.setProperty('--orb-1', a.c + '55');
-  r.setProperty('--orb-2', a.deep + '3d');
-  r.setProperty('--orb-3', a.soft + '33');
+  r.setProperty('--orb-1', a.c + (f.clair ? '44' : '55'));
+  r.setProperty('--orb-2', a.deep + (f.clair ? '2e' : '3d'));
+  r.setProperty('--orb-3', a.soft + (f.clair ? '3a' : '33'));
   const m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', f.v[2]);
+  if (m) m.setAttribute('content', f.clair ? f.v[1] : f.v[2]);
 }
 
 /* Recharge la base depuis Supabase puis rafraîchit l'écran courant. */
@@ -1532,9 +1638,9 @@ function chartRing(ratio, centerTop, centerSub) {
     <circle class="ring-bg" cx="80" cy="80" r="${r}" fill="none" stroke-width="13"/>
     <circle class="ring-fg" cx="80" cy="80" r="${r}" fill="none" stroke="${col}" stroke-width="13"
       stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 80 80)"/>
-    <text x="80" y="76" text-anchor="middle" fill="#F2F6FF" font-size="27" font-weight="700"
+    <text x="80" y="76" text-anchor="middle" fill="var(--ink)" font-size="27" font-weight="700"
       font-family="var(--font)" letter-spacing="-1">${centerTop}</text>
-    <text x="80" y="97" text-anchor="middle" fill="rgba(242,246,255,.5)" font-size="11.5"
+    <text x="80" y="97" text-anchor="middle" fill="var(--ink-3)" font-size="11.5"
       font-weight="560" font-family="var(--font)">${centerSub}</text></svg>`;
 }
 
@@ -1551,9 +1657,9 @@ function chartDonut(items) {
     acc += frac; return s;
   }).join('');
   return `<svg class="chart" viewBox="0 0 160 160" style="max-width:168px;margin:0 auto;display:block">${segs}
-    <text x="80" y="76" text-anchor="middle" fill="#F2F6FF" font-size="19" font-weight="700"
+    <text x="80" y="76" text-anchor="middle" fill="var(--ink)" font-size="19" font-weight="700"
       font-family="var(--font)" letter-spacing="-.6">${eur0(tot)}</text>
-    <text x="80" y="94" text-anchor="middle" fill="rgba(242,246,255,.5)" font-size="10.5"
+    <text x="80" y="94" text-anchor="middle" fill="var(--ink-3)" font-size="10.5"
       font-weight="560" font-family="var(--font)">total</text></svg>`;
 }
 
@@ -1735,6 +1841,7 @@ function th(view, key, label, cls = '') {
   const on = st.key === key;
   return `<th class="${cls} ${on ? 'sorted' : ''}" data-sort="${view}:${key}">${label}<span class="ar">${on && st.dir === 1 ? '▲' : '▼'}</span></th>`;
 }
+const contactNom = c => [c.prenom, c.nomContact].filter(Boolean).join(' ').trim() || c.contact || '';
 const clientName = id => { const c = S.db.clients.find(x => x.id === id); return c ? c.nom : 'Client de passage'; };
 const produitName = id => { const p = S.db.produits.find(x => x.id === id); return p ? p.nom : 'Produit supprimé'; };
 
@@ -2026,7 +2133,7 @@ function viewClients() {
         return `<tr>
           <td data-open="client:${c.id}" style="cursor:pointer"><div class="cellflex">
             <div class="bub" style="background:${hueFor(c.nom)}">${initials(c.nom)}</div>
-            <div class="t"><b>${esc(c.nom)}</b><span>${esc(c.contact || 'Contact non renseigné')}</span></div></div></td>
+            <div class="t"><b>${esc(c.nom)}</b><span>${esc(contactNom(c) || 'Contact non renseigné')}</span></div></div></td>
           <td style="color:var(--ink-2)">${esc(c.ville || '—')}</td>
           <td style="color:var(--ink-3);font-size:12.5px">${esc(c.tel || c.email || '—')}</td>
           <td><span class="pill ${pillCls}">${pillTxt}</span></td>
@@ -2346,15 +2453,17 @@ function viewParams() {
           </div>
           <span class="hint">${esc((VERRES[st.verre] || VERRES.verre).d)}</span>
         </div>
-        <div class="field">
-          <label>Fond de l'application</label>
-          <div class="fond-list">
-            ${Object.entries(FONDS).map(([k, f]) => `
-              <div class="fond-op ${st.fond === k ? 'on' : ''}" data-act="setFond:${k}">
-                <div class="apercu" style="background:radial-gradient(120% 120% at 50% 0%, ${f.v[0]}, ${f.v[1]} 55%, ${f.v[2]})"></div>
-                <b>${f.n}</b></div>`).join('')}
-          </div>
-        </div>
+        ${[['Fonds sombres', false], ['Fonds clairs', true]].map(([titre, clair]) => `
+          <div class="field" style="margin-bottom:16px">
+            <label>${titre}</label>
+            <div class="fond-list">
+              ${Object.entries(FONDS).filter(([, f]) => !!f.clair === clair).map(([k, f]) => `
+                <div class="fond-op ${st.fond === k ? 'on' : ''}" data-act="setFond:${k}">
+                  <div class="apercu" style="background:radial-gradient(120% 120% at 50% 0%, ${f.v[0]}, ${f.v[1]} 55%, ${f.v[2]});
+                    ${f.clair ? 'border:1px solid rgba(10,22,38,.10)' : ''}"></div>
+                  <b>${f.n}</b></div>`).join('')}
+            </div>
+          </div>`).join('')}
       </div>
 
       <div class="glass card">
@@ -2680,9 +2789,10 @@ function modalVente(id, clientPre) {
           <label for="fClient">Client</label>
           <select class="inp" id="fClient">
             <option value="">Client de passage</option>
+            <option value="__new">＋ Nouveau client…</option>
             ${S.db.clients.map(c => `<option value="${c.id}" ${(v?.clientId || clientPre) === c.id ? 'selected' : ''}>${esc(c.nom)}${c.ville ? ' — ' + esc(c.ville) : ''}</option>`).join('')}
           </select>
-          <span class="hint">Laissez sur « Client de passage » pour une vente ponctuelle.</span>
+          <span class="hint">« Nouveau client » crée la fiche automatiquement à l'enregistrement.</span>
         </div>
         <div class="field"><label for="fDate">Date de la vente</label>
           <input class="inp" id="fDate" type="date" value="${v?.date || today()}"></div>
@@ -2694,6 +2804,26 @@ function modalVente(id, clientPre) {
             <option value="attente" ${v?.statut === 'attente' ? 'selected' : ''}>En attente de paiement</option>
             <option value="annulee" ${v?.statut === 'annulee' ? 'selected' : ''}>Annulée</option>
           </select></div>
+      </div>
+
+      <div class="hidden" id="ncBox" style="margin-bottom:18px;padding:16px;border-radius:var(--r-md);
+        background:rgba(46,139,255,.08);border:1px solid rgba(46,139,255,.22)">
+        <div class="card-h" style="margin-bottom:13px"><div><h3>Fiche du nouveau client</h3>
+          <div class="sub">Enregistrée en même temps que la vente</div></div></div>
+        <div class="form-grid">
+          <div class="field full"><label for="ncEnseigne">Nom de l'enseigne</label>
+            <input class="inp" id="ncEnseigne" type="text" placeholder="Le Comptoir des Halles"></div>
+          <div class="field"><label for="ncPrenom">Prénom</label>
+            <input class="inp" id="ncPrenom" type="text" placeholder="Marie"></div>
+          <div class="field"><label for="ncNom">Nom</label>
+            <input class="inp" id="ncNom" type="text" placeholder="Dubois"></div>
+          <div class="field"><label for="ncTel">Téléphone</label>
+            <input class="inp" id="ncTel" type="tel" placeholder="06 12 34 56 78"></div>
+          <div class="field"><label for="ncMail">E-mail</label>
+            <input class="inp" id="ncMail" type="email" placeholder="contact@commerce.fr"></div>
+          <div class="field full"><label for="ncVille">Ville</label>
+            <input class="inp" id="ncVille" type="text" placeholder="La Rochelle"></div>
+        </div>
       </div>
 
       <div class="card-h"><div><h3>Articles vendus</h3></div><div class="spacer"></div>
@@ -2717,11 +2847,44 @@ function modalVente(id, clientPre) {
   renderLines('vente');
   $('#addLine').onclick = () => { draft.lignes.push({ produitId: prods[0].id, qte: 1, prix: Number(prods[0].prixRef) || 0 }); renderLines('vente'); };
   $('#fRemise').oninput = () => paintTotals('vente');
+
+  const majClient = () => {
+    const neuf = $('#fClient').value === '__new';
+    $('#ncBox').classList.toggle('hidden', !neuf);
+    if (neuf) setTimeout(() => $('#ncEnseigne').focus(), 60);
+  };
+  $('#fClient').onchange = majClient;
+  majClient();
+
   $('#saveVente').onclick = async () => {
     if (!draft.lignes.length) return toast('Ajoutez au moins un article.', 'er');
+
+    let clientId = $('#fClient').value || null;
+
+    /* création de la fiche client à la volée */
+    if (clientId === '__new') {
+      const enseigne = $('#ncEnseigne').value.trim();
+      const prenom = $('#ncPrenom').value.trim();
+      const nomC = $('#ncNom').value.trim();
+      const libelle = enseigne || [prenom, nomC].filter(Boolean).join(' ').trim();
+      if (!libelle) {
+        $('#ncEnseigne').classList.add('err');
+        return toast("Indiquez au moins l'enseigne ou le nom du client.", 'er');
+      }
+      const nouveau = {
+        id: uid(), nom: libelle, prenom, nomContact: nomC,
+        ville: $('#ncVille').value.trim(), tel: $('#ncTel').value.trim(),
+        email: $('#ncMail').value.trim(), secteur: '', statut: 'client', notes: ''
+      };
+      const cree = await API.saveClient(nouveau);
+      if (!cree) return;
+      clientId = cree;
+      toast(`${libelle} ajouté à vos clients.`);
+    }
+
     const rec = {
       id: v?.id || uid(),
-      clientId: $('#fClient').value || null,
+      clientId,
       date: $('#fDate').value || today(),
       moyen: $('#fMoyen').value,
       statut: $('#fStatut').value,
@@ -2737,6 +2900,7 @@ function modalVente(id, clientPre) {
       const c = S.db.clients.find(x => x.id === rec.clientId);
       if (c && c.statut === 'prospect') { c.statut = 'client'; await API.saveClient(c); }
     }
+    S.filters.ventes = S.filters.ventes || {};
     closeModal(); await recharger();
     toast(v ? 'Vente mise à jour.' : `Vente de ${eur(Calc.totalVente(rec))} enregistrée.`);
   };
@@ -2817,10 +2981,12 @@ function modalClient(id) {
       <p>Un commerce démarché ou déjà équipé.</p></div><div class="spacer"></div>
       <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
     <div class="sheet-b"><div class="form-grid">
-      <div class="field full"><label for="cNom">Nom du commerce</label>
+      <div class="field full"><label for="cNom">Nom de l'enseigne</label>
         <input class="inp" id="cNom" type="text" placeholder="Le Comptoir des Halles" value="${esc(c?.nom || '')}"></div>
-      <div class="field"><label for="cContact">Personne à contacter</label>
-        <input class="inp" id="cContact" type="text" placeholder="Marie Dubois" value="${esc(c?.contact || '')}"></div>
+      <div class="field"><label for="cPrenom">Prénom du contact</label>
+        <input class="inp" id="cPrenom" type="text" placeholder="Marie" value="${esc(c?.prenom || '')}"></div>
+      <div class="field"><label for="cContact">Nom du contact</label>
+        <input class="inp" id="cContact" type="text" placeholder="Dubois" value="${esc(c?.nomContact || '')}"></div>
       <div class="field"><label for="cVille">Ville</label>
         <input class="inp" id="cVille" type="text" placeholder="La Rochelle" value="${esc(c?.ville || '')}"></div>
       <div class="field"><label for="cTel">Téléphone</label>
@@ -2845,9 +3011,11 @@ function modalClient(id) {
 
   $('#saveClient').onclick = async () => {
     const nom = $('#cNom').value.trim();
-    if (!nom) { $('#cNom').classList.add('err'); return toast('Indiquez le nom du commerce.', 'er'); }
+    if (!nom) { $('#cNom').classList.add('err'); return toast("Indiquez le nom de l'enseigne.", 'er'); }
     const rec = {
-      id: c?.id || uid(), nom, contact: $('#cContact').value.trim(), ville: $('#cVille').value.trim(),
+      id: c?.id || uid(), nom,
+      prenom: $('#cPrenom').value.trim(), nomContact: $('#cContact').value.trim(),
+      ville: $('#cVille').value.trim(),
       tel: $('#cTel').value.trim(), email: $('#cMail').value.trim(), statut: $('#cStatut').value,
       secteur: $('#cSecteur').value.trim(), notes: $('#cNotes').value.trim(),
       createdAt: c?.createdAt || new Date().toISOString()
@@ -2994,8 +3162,8 @@ function detailClient(id) {
         <div class="glass" style="padding:13px"><div class="kpi-lbl" style="font-size:10px">Commandes</div>
           <div style="font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:4px">${vs.filter(v => v.statut !== 'annulee').length}</div></div>
       </div>
-      ${(c.contact || c.tel || c.email) ? `<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px">
-        ${c.contact ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-user"/></svg>${esc(c.contact)}</span>` : ''}
+      ${(contactNom(c) || c.tel || c.email) ? `<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px">
+        ${contactNom(c) ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-user"/></svg>${esc(contactNom(c))}</span>` : ''}
         ${c.tel ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-phone"/></svg>${esc(c.tel)}</span>` : ''}
         ${c.email ? `<span class="chip"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><use href="#i-mail"/></svg>${esc(c.email)}</span>` : ''}
       </div>` : ''}
@@ -3052,7 +3220,7 @@ function exportCmd() {
 function exportClients() {
   const rows = [['Nom', 'Contact', 'Ville', 'Téléphone', 'E-mail', 'Secteur', 'Statut', 'Nb ventes', 'CA généré', 'Notes']];
   for (const c of S.db.clients)
-    rows.push([c.nom, c.contact || '', c.ville || '', c.tel || '', c.email || '', c.secteur || '', c.statut || '',
+    rows.push([c.nom, contactNom(c), c.ville || '', c.tel || '', c.email || '', c.secteur || '', c.statut || '',
       S.db.ventes.filter(v => v.clientId === c.id && v.statut !== 'annulee').length, rnd(Calc.caClient(c.id)), c.notes || '']);
   download(`clients-${today()}.csv`, csv(rows));
 }
