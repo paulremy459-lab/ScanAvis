@@ -812,7 +812,12 @@ html.clair .trend.fl{background:rgba(10,22,38,.06);color:var(--ink-3)}
       <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
       <input class="search" id="globalSearch" placeholder="Rechercher un client, une vente…">
     </div>
-    <button class="btn ico" id="btnBell" title="Alertes"><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg></button>
+    <button class="btn ico" id="btnBell" title="Notifications" style="position:relative">
+      <svg viewBox="0 0 24 24"><use href="#i-bell"/></svg>
+      <span id="bellPip" class="hidden" style="position:absolute;top:-2px;right:-2px;min-width:17px;height:17px;
+        padding:0 4px;border-radius:999px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;
+        display:grid;place-items:center;border:2px solid var(--navy-800)"></span>
+    </button>
     <div class="avatar" id="userChip" title="Mon compte"></div>
   </header>
 
@@ -840,7 +845,7 @@ html.clair .trend.fl{background:rgba(10,22,38,.06);color:var(--ink-3)}
 /* ═══════════════ CONFIGURATION — les 3 seules lignes à renseigner ═══════════════ */
 const SUPABASE_URL  = 'https://nluzgsbiiojubpihgndu.supabase.co';   // sans /rest/v1
 const SUPABASE_KEY  = 'sb_publishable_-k8g-jHnx_t8oRghusA-Vg_jKrK07Un';   // clé publiable — sans danger dans le code
-const ADMIN_EMAIL   = 'paul.remy459@gmail.com';
+const ADMIN_EMAIL   = 'paul.remy459@gmail.com';   // compte fondateur ; les autres s'ajoutent depuis l'app
 /* ══════════════════════════════════════════════════════════════════════════════ */
 
 /* Affiche une panne au lieu de laisser tourner l'écran de chargement. */
@@ -960,7 +965,9 @@ const S = {
   sort: {},
   filters: {},
   allUsers: [],
-  ent: null            // activité (entreprise) actuellement ouverte
+  ent: null,           // activité (entreprise) actuellement ouverte
+  annonces: [],        // messages diffusés par les administrateurs
+  admins: []
 };
 
 /* ============================================================================
@@ -1056,6 +1063,9 @@ const Convertir = {
   vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
   commande: r => ({ id: r.id, fournisseur: r.fournisseur, date: r.date, statut: r.statut, frais: toNum(r.frais), notes: r.notes || '', dateReception: r.date_reception, createdAt: r.created_at, lignes: [] }),
   charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date }),
+  annonce: r => ({ id: r.id, titre: r.titre, message: r.message || '', type: r.type || 'info',
+    lienUrl: r.lien_url || '', lienLibelle: r.lien_libelle || '', active: r.active,
+    debut: r.debut, fin: r.fin, createdAt: r.created_at }),
   entreprise: r => ({ id: r.id, nom: r.nom, secteur: r.secteur || '', objectif: toNum(r.objectif),
     couleur: r.couleur || '#2E8BFF', enseigne: r.enseigne || '', adresse: r.adresse || '',
     siret: r.siret || '', telephone: r.telephone || '', emailPro: r.email_pro || '' })
@@ -1105,6 +1115,7 @@ const API = {
       sb.from('charges').select('*').eq('entreprise_id', e).order('date', { ascending: false }),
       sb.from('parametres').select('*').eq('user_id', u).maybeSingle()
     ]);
+    S.annonces = await this.listerAnnonces();
     const err = [prod, cli, ven, vli, cmd, cli2, chg, par].find(r => r.error);
     if (err) throw err.error;
 
@@ -1257,6 +1268,65 @@ const API = {
     return !boum(error);
   },
 
+  /* ---- administrateurs ---- */
+  async suisJeAdmin() {
+    const { data, error } = await sb.rpc('est_admin');
+    if (error) { console.warn(error); return false; }
+    return !!data;
+  },
+  async listerAdmins() {
+    const { data, error } = await sb.rpc('admin_lister');
+    if (boum(error)) return [];
+    return data || [];
+  },
+  async ajouterAdmin(email) {
+    const { error } = await sb.rpc('admin_ajouter', { p_email: email });
+    return !boum(error);
+  },
+  async retirerAdmin(email) {
+    const { error } = await sb.rpc('admin_retirer', { p_email: email });
+    return !boum(error);
+  },
+
+  /* ---- annonces ---- */
+  async listerAnnonces() {
+    const [a, v] = await Promise.all([
+      sb.from('annonces').select('*').eq('active', true).lte('debut', today())
+        .order('created_at', { ascending: false }),
+      sb.from('annonces_vues').select('annonce_id')
+    ]);
+    if (a.error) { console.warn(a.error); return []; }
+    const masquees = new Set((v.data || []).map(x => x.annonce_id));
+    return (a.data || [])
+      .filter(x => !masquees.has(x.id))
+      .filter(x => !x.fin || x.fin >= today())
+      .map(Convertir.annonce);
+  },
+  async listerToutesAnnonces() {
+    const { data, error } = await sb.from('annonces').select('*').order('created_at', { ascending: false });
+    if (boum(error)) return [];
+    return (data || []).map(Convertir.annonce);
+  },
+  async saveAnnonce(rec) {
+    const champs = {
+      titre: rec.titre, message: rec.message, type: rec.type,
+      lien_url: rec.lienUrl, lien_libelle: rec.lienLibelle,
+      active: rec.active, debut: rec.debut, fin: rec.fin || null
+    };
+    const { error } = rec.id
+      ? await sb.from('annonces').update(champs).eq('id', rec.id)
+      : await sb.from('annonces').insert({ ...champs, auteur: S.user.id });
+    return !boum(error);
+  },
+  async supprimerAnnonce(id) {
+    const { error } = await sb.from('annonces').delete().eq('id', id);
+    return !boum(error);
+  },
+  async masquerAnnonce(id) {
+    const { error } = await sb.from('annonces_vues').upsert({ user_id: S.user.id, annonce_id: id });
+    return !boum(error);
+  },
+
   async statsAdmin() {
     const { data, error } = await sb.rpc('admin_statistiques');
     if (boum(error)) return [];
@@ -1348,6 +1418,7 @@ async function recharger(silencieux) {
     S.db = await API.chargerTout();
     appliquerTheme(S.db.settings);
     peindreActivite();
+    peindreNotifications();
     if (!silencieux) { buildNav(); render(); }
   } catch (e) {
     console.error(e);
@@ -1378,8 +1449,9 @@ async function openSession() {
     nomFamille: prof?.nom_famille || '',
     telephone: prof?.telephone || '',
     createdAt: prof?.created_at || user.created_at,
-    isAdmin: user.email === ADMIN_EMAIL
+    isAdmin: false
   };
+  S.user.isAdmin = await API.suisJeAdmin();
 
   try {
     S.db = await API.chargerTout();
@@ -1397,6 +1469,7 @@ async function openSession() {
   $('#brandSub').textContent = S.user.isAdmin ? 'Administrateur' : "Gestion d'activité";
   appliquerTheme(S.db.settings);
   peindreActivite();
+  peindreNotifications();
   buildNav();
   go('dash');
   return true;
@@ -1544,6 +1617,14 @@ const NAV = [
   ]}
 ];
 const TABS = ['dash', 'ventes', 'commandes', 'stock', 'clients'];
+
+function peindreNotifications() {
+  const n = (S.annonces || []).length;
+  const pip = $('#bellPip');
+  if (!pip) return;
+  pip.classList.toggle('hidden', !n);
+  pip.textContent = n > 9 ? '9+' : n;
+}
 
 function peindreActivite() {
   const e = (S.db?.entreprises || []).find(x => x.id === S.ent);
@@ -1736,6 +1817,8 @@ function viewDash() {
     <button class="btn pri" data-act="newVente"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Nouvelle vente</button>
   </div>
 
+  ${bandeauxAnnonces()}
+
   ${alertes.length ? `<div style="margin-bottom:18px">${alertes.slice(0, 3).map(a => `
     <div class="alert ${a.n}" data-go="${a.go}" style="cursor:pointer">
       <svg viewBox="0 0 24 24"><use href="#${a.n === 'b' ? 'i-info' : 'i-alert'}"/></svg>
@@ -1814,6 +1897,40 @@ function viewDash() {
           : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Pas encore de client sur la période</div>`}
       </div>
     </div>
+  </div>`;
+}
+
+const TYPES_ANNONCE = {
+  info:   { n: 'Information', cls: 'b', ico: 'i-info',   col: '#2E8BFF' },
+  promo:  { n: 'Offre',       cls: 'v', ico: 'i-spark',  col: '#A78BFA' },
+  alerte: { n: 'Alerte',      cls: 'r', ico: 'i-alert',  col: '#FF453A' },
+  maj:    { n: 'Nouveauté',   cls: 'g', ico: 'i-trend',  col: '#32D74B' }
+};
+
+function bandeauxAnnonces() {
+  const list = S.annonces || [];
+  if (!list.length) return '';
+  return `<div style="margin-bottom:18px;display:flex;flex-direction:column;gap:11px">
+    ${list.map(a => {
+      const t = TYPES_ANNONCE[a.type] || TYPES_ANNONCE.info;
+      return `<div class="glass card" style="padding:16px 18px;border-color:${t.col}44">
+        <div style="display:flex;align-items:flex-start;gap:13px">
+          <div class="kpi-ico" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18);color:${t.col}">
+            <svg viewBox="0 0 24 24"><use href="#${t.ico}"/></svg></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+              <b style="font-size:14.5px;font-weight:640;letter-spacing:-.015em">${esc(a.titre)}</b>
+              <span class="pill ${t.cls}">${t.n}</span>
+            </div>
+            ${a.message ? `<p style="font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:6px;white-space:pre-wrap">${esc(a.message)}</p>` : ''}
+            ${a.lienUrl ? `<a href="${esc(a.lienUrl)}" target="_blank" rel="noopener noreferrer"
+              class="btn sm pri" style="margin-top:11px;text-decoration:none">${esc(a.lienLibelle || 'En savoir plus')}</a>` : ''}
+          </div>
+          <button class="btn ico sm gho" data-act="masquerAnnonce:${a.id}" title="Masquer">
+            <svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
@@ -2580,6 +2697,63 @@ function modalActivite(id) {
   };
 }
 
+/* ---------- Modale ANNONCE ---------- */
+function modalAnnonce(id) {
+  const a = id ? (S.allAnnonces || []).find(x => x.id === id) : null;
+  openModal(`<div class="sheet">
+    <div class="sheet-h"><div><h2>${a ? 'Modifier l\'annonce' : 'Nouvelle annonce'}</h2>
+      <p>Visible par tous les utilisateurs sur leur tableau de bord.</p></div>
+      <div class="spacer"></div>
+      <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-b"><div class="form-grid">
+      <div class="field full"><label for="anTitre">Titre</label>
+        <input class="inp" id="anTitre" type="text" placeholder="−10 % sur le Discord ce week-end" value="${esc(a?.titre || '')}"></div>
+      <div class="field full"><label for="anMsg">Message</label>
+        <textarea class="inp" id="anMsg" placeholder="Détaillez votre offre, la marche à suivre, la date limite…">${esc(a?.message || '')}</textarea></div>
+      <div class="field"><label for="anType">Type</label>
+        <select class="inp" id="anType">
+          ${Object.entries(TYPES_ANNONCE).map(([k, t]) =>
+            `<option value="${k}" ${(a?.type || 'promo') === k ? 'selected' : ''}>${t.n}</option>`).join('')}
+        </select>
+        <span class="hint">Détermine la couleur et l'icône affichées.</span></div>
+      <div class="field"><label for="anLibelle">Libellé du bouton</label>
+        <input class="inp" id="anLibelle" type="text" placeholder="Rejoindre le Discord" value="${esc(a?.lienLibelle || '')}"></div>
+      <div class="field full"><label for="anUrl">Lien (facultatif)</label>
+        <input class="inp" id="anUrl" type="url" placeholder="https://discord.gg/..." value="${esc(a?.lienUrl || '')}"></div>
+      <div class="field"><label for="anDebut">Affichée à partir du</label>
+        <input class="inp" id="anDebut" type="date" value="${a?.debut || today()}"></div>
+      <div class="field"><label for="anFin">Jusqu'au (facultatif)</label>
+        <input class="inp" id="anFin" type="date" value="${a?.fin || ''}"></div>
+      <div class="full sw-row"><div class="t"><b>Annonce en ligne</b>
+        <span>Décochez pour la préparer sans la diffuser tout de suite</span></div>
+        <div class="sw ${a?.active !== false ? 'on' : ''}" id="anActive"></div></div>
+    </div></div>
+    <div class="sheet-f"><div class="spacer"></div>
+      <button class="btn" data-close>Annuler</button>
+      <button class="btn pri" id="saveAnnonce">${a ? 'Enregistrer' : 'Publier'}</button></div>
+  </div>`);
+
+  $('#anActive').onclick = e => e.currentTarget.classList.toggle('on');
+  $('#saveAnnonce').onclick = async () => {
+    const titre = $('#anTitre').value.trim();
+    if (!titre) { $('#anTitre').classList.add('err'); return toast('Donnez un titre à votre annonce.', 'er'); }
+    const url = $('#anUrl').value.trim();
+    if (url && !/^https?:\/\//i.test(url)) { $('#anUrl').classList.add('err'); return toast('Le lien doit commencer par https://', 'er'); }
+    const ok = await API.saveAnnonce({
+      id: a?.id, titre, message: $('#anMsg').value.trim(), type: $('#anType').value,
+      lienUrl: url, lienLibelle: $('#anLibelle').value.trim(),
+      active: $('#anActive').classList.contains('on'),
+      debut: $('#anDebut').value || today(), fin: $('#anFin').value || null
+    });
+    if (!ok) return;
+    closeModal();
+    S.annonces = await API.listerAnnonces();
+    peindreNotifications();
+    await loadAdmin(); render();
+    toast(a ? 'Annonce mise à jour.' : 'Annonce publiée.');
+  };
+}
+
 /* ---------- Sélecteur d'activité ---------- */
 function ouvrirSelecteurActivite() {
   const ents = S.db.entreprises || [];
@@ -2600,7 +2774,7 @@ function ouvrirSelecteurActivite() {
 }
 
 /* ============================================================================
-   VUE — ADMINISTRATION (réservée à ADMIN_EMAIL)
+   VUE — ADMINISTRATION (réservée aux adresses de la table administrateurs)
    ============================================================================ */
 function viewAdmin() {
   if (!S.user.isAdmin) return emptyState('i-lock', 'Accès réservé', "Cet écran n'est accessible qu'à l'administrateur de la plateforme.");
@@ -2631,7 +2805,8 @@ function viewAdmin() {
         <th class="nos num">Clients</th><th class="nos num">Ventes</th><th class="nos num">CA généré</th>
         <th class="nos">État</th><th class="nos"></th></tr></thead>
       <tbody>${us.map(u => {
-        const isAdm = u.email === ADMIN_EMAIL, me = u.id === S.user.id;
+        const isAdm = (S.admins || []).some(x => x.email === String(u.email).toLowerCase());
+        const me = u.id === S.user.id;
         return `<tr>
           <td><div class="cellflex"><div class="bub" style="background:${isAdm ? 'linear-gradient(150deg,#FFB020,#FF6B35)' : hueFor(u.name)}">${initials(u.name)}</div>
             <div class="t"><b>${esc(u.name)}${me ? ' <span style="color:var(--ink-4);font-weight:500">(vous)</span>' : ''}</b><span>${esc(u.email)}</span></div></div></td>
@@ -2649,9 +2824,51 @@ function viewAdmin() {
       : `<div style="padding:34px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Chargement des comptes…</div>`}
   </div>
 
+  <div class="grid g2" style="margin-top:15px">
+    <div class="glass card">
+      <div class="card-h"><div><h3>Administrateurs</h3><div class="sub">Ces adresses accèdent à cet écran et publient les annonces</div></div></div>
+      <div class="field" style="margin-bottom:15px">
+        <label for="admMail">Inviter une adresse</label>
+        <div style="display:flex;gap:9px">
+          <input class="inp" id="admMail" type="email" placeholder="collegue@exemple.fr" style="flex:1">
+          <button class="btn pri" data-act="addAdmin">Inviter</button>
+        </div>
+        <span class="hint">La personne devient administratrice dès sa prochaine connexion. Elle doit créer un compte avec cette adresse exacte.</span>
+      </div>
+      ${(S.admins || []).map(a => `
+        <div class="sw-row">
+          <div class="bub" style="background:${hueFor(a.email)}"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#i-admin"/></svg></div>
+          <div class="t"><b>${esc(a.email)}</b><span>${a.protege ? 'Compte fondateur, non retirable' : 'Ajouté le ' + dfr(String(a.created_at).slice(0, 10))}</span></div>
+          ${a.protege ? '<span class="pill o">Protégé</span>'
+            : `<button class="btn ico sm dgr" data-act="delAdmin:${esc(a.email)}" title="Retirer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>`}
+        </div>`).join('')}
+    </div>
+
+    <div class="glass card">
+      <div class="card-h"><div><h3>Annonces</h3><div class="sub">Diffusées à tous les utilisateurs de la plateforme</div></div>
+        <div class="spacer"></div>
+        <button class="btn sm pri" data-act="newAnnonce"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Publier</button></div>
+      ${(S.allAnnonces || []).length ? (S.allAnnonces || []).map(a => {
+        const t = TYPES_ANNONCE[a.type] || TYPES_ANNONCE.info;
+        const finie = a.fin && a.fin < today();
+        return `<div class="sw-row" style="align-items:flex-start">
+          <div class="kpi-ico" style="width:30px;height:30px;background:linear-gradient(150deg,${t.col}3a,${t.col}18);color:${t.col}">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#${t.ico}"/></svg></div>
+          <div class="t"><b>${esc(a.titre)}</b>
+            <span>${esc((a.message || '').slice(0, 90))}${(a.message || '').length > 90 ? '…' : ''}</span>
+            <span style="margin-top:4px">${a.active && !finie ? '<span class="pill g">En ligne</span>' : '<span class="pill n">Hors ligne</span>'}
+              ${a.fin ? ' · jusqu\'au ' + dfr(a.fin) : ''}</span></div>
+          <button class="btn ico sm" data-act="editAnnonce:${a.id}"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+          <button class="btn ico sm dgr" data-act="delAnnonce:${a.id}"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+        </div>`;
+      }).join('')
+        : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Aucune annonce publiée</div>`}
+    </div>
+  </div>
+
   <div class="glass card" style="margin-top:15px">
     <div class="card-h"><div><h3>Paramètres de la plateforme</h3></div></div>
-    <div class="sw-row"><div class="t"><b>Adresse administrateur</b><span>Seul ce compte accède à cet écran. Modifiable dans le code, constante <span class="mono">ADMIN_EMAIL</span>.</span></div>
+    <div class="sw-row"><div class="t"><b>Compte fondateur</b><span>Protégé, il ne peut pas être retiré de la liste des administrateurs</span></div>
       <span class="chip mono">${esc(ADMIN_EMAIL)}</span></div>
     <div class="sw-row"><div class="t"><b>Base de données</b><span>Postgres hébergé, isolation par Row Level Security</span></div>
       <span class="chip mono">${esc(SUPABASE_URL.replace('https://', ''))}</span></div>
@@ -2659,7 +2876,11 @@ function viewAdmin() {
 }
 
 async function loadAdmin() {
-  const lignes = await API.statsAdmin();
+  const [lignes, admins, annonces] = await Promise.all([
+    API.statsAdmin(), API.listerAdmins(), API.listerToutesAnnonces()
+  ]);
+  S.admins = admins;
+  S.allAnnonces = annonces;
   S.allUsers = lignes.map(r => ({
     id: r.id, email: r.email, name: r.nom || r.email.split('@')[0],
     actif: r.actif, createdAt: r.created_at,
@@ -3417,6 +3638,40 @@ const ACTIONS = {
     toast('Coordonnées enregistrées.');
   },
 
+  newAnnonce: () => modalAnnonce(),
+  editAnnonce: id => modalAnnonce(id),
+  delAnnonce: async id => {
+    const a = (S.allAnnonces || []).find(x => x.id === id); if (!a) return;
+    if (!await confirmer('Supprimer l\'annonce', `« ${a.titre} » disparaîtra de l'écran de tous les utilisateurs.`)) return;
+    if (!await API.supprimerAnnonce(id)) return;
+    S.annonces = await API.listerAnnonces();
+    peindreNotifications();
+    await loadAdmin(); render(); toast('Annonce supprimée.');
+  },
+  masquerAnnonce: async id => {
+    if (!await API.masquerAnnonce(id)) return;
+    S.annonces = (S.annonces || []).filter(x => x.id !== id);
+    peindreNotifications();
+    closeModal(); render();
+  },
+  addAdmin: async () => {
+    const mail = $('#admMail').value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) {
+      $('#admMail').classList.add('err');
+      return toast("Cette adresse e-mail n'est pas valide.", 'er');
+    }
+    if (!await API.ajouterAdmin(mail)) return;
+    await loadAdmin(); render();
+    toast(`${mail} est désormais administrateur.`);
+  },
+  delAdmin: async email => {
+    if (!await confirmer('Retirer cet administrateur',
+      `${email} perdra l'accès à l'écran Administration. Son compte et ses données restent intacts.`,
+      'Retirer')) return;
+    if (!await API.retirerAdmin(email)) return;
+    await loadAdmin(); render(); toast('Administrateur retiré.');
+  },
+
   newActivite: () => modalActivite(),
   editActivite: id => modalActivite(id),
   switchEnt: async id => {
@@ -3566,13 +3821,28 @@ $('#userChip').onclick = () => go('params');
 $('#entPick').onclick = () => ouvrirSelecteurActivite();
 $('#btnBell').onclick = () => {
   const a = Calc.alertes();
-  if (!a.length) return toast('Rien à signaler, tout est à jour.', 'in');
+  const an = S.annonces || [];
+  if (!a.length && !an.length) return toast('Rien à signaler, tout est à jour.', 'in');
   openModal(`<div class="sheet narrow">
-    <div class="sheet-h"><div><h2>Alertes</h2><p>${a.length} point${a.length > 1 ? 's' : ''} à surveiller</p></div><div class="spacer"></div>
+    <div class="sheet-h"><div><h2>Notifications</h2>
+      <p>${an.length ? an.length + ' annonce' + (an.length > 1 ? 's' : '') : 'Aucune annonce'} · ${a.length} point${a.length > 1 ? 's' : ''} à surveiller</p></div>
+      <div class="spacer"></div>
       <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
-    <div class="sheet-b">${a.map(x => `<div class="alert ${x.n}">
-      <svg viewBox="0 0 24 24"><use href="#${x.n === 'b' ? 'i-info' : 'i-alert'}"/></svg>
-      <div class="t"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></div></div>`).join('')}</div></div>`);
+    <div class="sheet-b">
+      ${an.map(x => {
+        const t = TYPES_ANNONCE[x.type] || TYPES_ANNONCE.info;
+        return `<div class="alert ${t.cls === 'v' ? 'b' : t.cls === 'g' ? 'b' : t.cls}" style="align-items:flex-start">
+          <svg viewBox="0 0 24 24"><use href="#${t.ico}"/></svg>
+          <div class="t"><b>${esc(x.titre)}</b><span style="white-space:pre-wrap">${esc(x.message)}</span>
+            ${x.lienUrl ? `<a href="${esc(x.lienUrl)}" target="_blank" rel="noopener noreferrer"
+              style="color:var(--accent-soft);font-size:12px;font-weight:620;display:inline-block;margin-top:6px">${esc(x.lienLibelle || 'En savoir plus')} →</a>` : ''}</div>
+          <button class="btn ico sm gho" data-act="masquerAnnonce:${x.id}"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+        </div>`;
+      }).join('')}
+      ${a.map(x => `<div class="alert ${x.n}">
+        <svg viewBox="0 0 24 24"><use href="#${x.n === 'b' ? 'i-info' : 'i-alert'}"/></svg>
+        <div class="t"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></div></div>`).join('')}
+    </div></div>`);
 };
 
 document.addEventListener('keydown', e => {
