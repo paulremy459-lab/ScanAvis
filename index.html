@@ -1302,16 +1302,14 @@ const API = {
   },
 
   /* ---- annonces ---- */
+  /* Les annonces restent affichées tant qu'un administrateur ne les retire pas :
+     ni masquage individuel, ni fermeture côté utilisateur. */
   async listerAnnonces() {
-    const [a, v] = await Promise.all([
-      sb.from('annonces').select('*').eq('active', true).lte('debut', today())
-        .order('created_at', { ascending: false }),
-      sb.from('annonces_vues').select('annonce_id')
-    ]);
-    if (a.error) { console.warn(a.error); return []; }
-    const masquees = new Set((v.data || []).map(x => x.annonce_id));
-    return (a.data || [])
-      .filter(x => !masquees.has(x.id))
+    const { data, error } = await sb.from('annonces').select('*')
+      .eq('active', true).lte('debut', today())
+      .order('created_at', { ascending: false });
+    if (error) { console.warn(error); return []; }
+    return (data || [])
       .filter(x => !x.fin || x.fin >= today())
       .map(Convertir.annonce);
   },
@@ -1335,11 +1333,6 @@ const API = {
     const { error } = await sb.from('annonces').delete().eq('id', id);
     return !boum(error);
   },
-  async masquerAnnonce(id) {
-    const { error } = await sb.from('annonces_vues').upsert({ user_id: S.user.id, annonce_id: id });
-    return !boum(error);
-  },
-
   async statsAdmin() {
     const { data, error } = await sb.rpc('admin_statistiques');
     if (boum(error)) return [];
@@ -1923,32 +1916,32 @@ const TYPES_ANNONCE = {
   maj:    { n: 'Nouveauté',   cls: 'g', ico: 'i-trend',  col: '#32D74B' }
 };
 
+function carteAnnonce(a) {
+  const t = TYPES_ANNONCE[a.type] || TYPES_ANNONCE.info;
+  return `<div class="glass card" style="padding:16px 18px;border-color:${t.col}44">
+    <div style="display:flex;align-items:flex-start;gap:13px">
+      ${a.emoji
+        ? `<div class="emo-bulle" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18)">${esc(a.emoji)}</div>`
+        : `<div class="kpi-ico" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18);color:${t.col}">
+             <svg viewBox="0 0 24 24"><use href="#${t.ico}"/></svg></div>`}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+          <b style="font-size:14.5px;font-weight:640;letter-spacing:-.015em">${esc(a.titre || 'Titre de votre annonce')}</b>
+          <span class="pill ${t.cls}">${t.n}</span>
+        </div>
+        ${a.message ? `<p style="font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:6px;white-space:pre-wrap">${esc(a.message)}</p>` : ''}
+        ${a.lienUrl ? `<a href="${esc(a.lienUrl)}" target="_blank" rel="noopener noreferrer"
+          class="btn sm pri" style="margin-top:11px;text-decoration:none">${esc(a.lienLibelle || 'En savoir plus')}</a>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
 function bandeauxAnnonces() {
   const list = S.annonces || [];
   if (!list.length) return '';
   return `<div style="margin-bottom:18px;display:flex;flex-direction:column;gap:11px">
-    ${list.map(a => {
-      const t = TYPES_ANNONCE[a.type] || TYPES_ANNONCE.info;
-      return `<div class="glass card" style="padding:16px 18px;border-color:${t.col}44">
-        <div style="display:flex;align-items:flex-start;gap:13px">
-          ${a.emoji
-            ? `<div class="emo-bulle" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18)">${esc(a.emoji)}</div>`
-            : `<div class="kpi-ico" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18);color:${t.col}">
-                 <svg viewBox="0 0 24 24"><use href="#${t.ico}"/></svg></div>`}
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
-              <b style="font-size:14.5px;font-weight:640;letter-spacing:-.015em">${esc(a.titre)}</b>
-              <span class="pill ${t.cls}">${t.n}</span>
-            </div>
-            ${a.message ? `<p style="font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:6px;white-space:pre-wrap">${esc(a.message)}</p>` : ''}
-            ${a.lienUrl ? `<a href="${esc(a.lienUrl)}" target="_blank" rel="noopener noreferrer"
-              class="btn sm pri" style="margin-top:11px;text-decoration:none">${esc(a.lienLibelle || 'En savoir plus')}</a>` : ''}
-          </div>
-          <button class="btn ico sm gho" data-act="masquerAnnonce:${a.id}" title="Masquer">
-            <svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
-        </div>
-      </div>`;
-    }).join('')}
+    ${list.map(a => carteAnnonce(a)).join('')}
   </div>`;
 }
 
@@ -2723,7 +2716,14 @@ function modalAnnonce(id) {
       <p>Visible par tous les utilisateurs sur leur tableau de bord.</p></div>
       <div class="spacer"></div>
       <button class="btn ico" data-close><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>
-    <div class="sheet-b"><div class="form-grid">
+    <div class="sheet-b">
+      <div class="field" style="margin-bottom:18px">
+        <label>Aperçu — ce que verront vos utilisateurs</label>
+        <div id="anApercu"></div>
+        <span class="hint">Personne ne peut la fermer de son côté : elle reste visible jusqu'à ce que
+          vous la passiez hors ligne, la supprimiez, ou que sa date de fin soit dépassée.</span>
+      </div>
+      <div class="form-grid">
       <div class="field full"><label for="anEmoji">Emoji affiché à gauche</label>
         <div style="display:flex;gap:11px;align-items:center;margin-bottom:9px">
           <input class="inp" id="anEmoji" type="text" maxlength="4" placeholder="🎉"
@@ -2745,10 +2745,16 @@ function modalAnnonce(id) {
             `<option value="${k}" ${(a?.type || 'promo') === k ? 'selected' : ''}>${t.n}</option>`).join('')}
         </select>
         <span class="hint">Détermine la couleur et l'icône affichées.</span></div>
-      <div class="field"><label for="anLibelle">Libellé du bouton</label>
-        <input class="inp" id="anLibelle" type="text" placeholder="Rejoindre le Discord" value="${esc(a?.lienLibelle || '')}"></div>
-      <div class="field full"><label for="anUrl">Lien (facultatif)</label>
-        <input class="inp" id="anUrl" type="url" placeholder="https://discord.gg/..." value="${esc(a?.lienUrl || '')}"></div>
+      <div class="field full" style="padding:14px;border-radius:var(--r-sm);background:rgba(255,255,255,.04);border:1px solid var(--stroke)">
+        <label style="margin-bottom:11px;display:block">Bouton d'action — facultatif</label>
+        <div class="form-grid">
+          <div class="field full"><label for="anUrl">Lien de destination</label>
+            <input class="inp" id="anUrl" type="text" placeholder="discord.gg/monserveur" value="${esc(a?.lienUrl || '')}">
+            <span class="hint">Sans lien, aucun bouton n'apparaît. Le <span class="mono">https://</span> est ajouté tout seul.</span></div>
+          <div class="field full"><label for="anLibelle">Texte du bouton</label>
+            <input class="inp" id="anLibelle" type="text" placeholder="Rejoindre le Discord" value="${esc(a?.lienLibelle || '')}"></div>
+        </div>
+      </div>
       <div class="field"><label for="anDebut">Affichée à partir du</label>
         <input class="inp" id="anDebut" type="date" value="${a?.debut || today()}"></div>
       <div class="field"><label for="anFin">Jusqu'au (facultatif)</label>
@@ -2764,24 +2770,51 @@ function modalAnnonce(id) {
 
   $('#anActive').onclick = e => e.currentTarget.classList.toggle('on');
 
+  const lireFormulaire = () => {
+    let url = $('#anUrl').value.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    return {
+      _apercu: true,
+      emoji: [...$('#anEmoji').value.trim()].slice(0, 3).join(''),
+      titre: $('#anTitre').value.trim(),
+      message: $('#anMsg').value.trim(),
+      type: $('#anType').value,
+      lienUrl: url,
+      lienLibelle: $('#anLibelle').value.trim()
+    };
+  };
+  const majApercu = () => { $('#anApercu').innerHTML = carteAnnonce(lireFormulaire()); };
+  ['anEmoji', 'anTitre', 'anMsg', 'anType', 'anUrl', 'anLibelle'].forEach(id => {
+    const el = $('#' + id);
+    el.addEventListener('input', majApercu);
+    el.addEventListener('change', majApercu);
+  });
+  majApercu();
+
   const majEmoji = () => {
     const v = $('#anEmoji').value.trim();
     $('#emoGrille').querySelectorAll('[data-emo]').forEach(b => b.classList.toggle('on', b.dataset.emo === v));
   };
   $('#emoGrille').querySelectorAll('[data-emo]').forEach(b => b.onclick = () => {
-    $('#anEmoji').value = b.dataset.emo; majEmoji();
+    $('#anEmoji').value = b.dataset.emo; majEmoji(); majApercu();
   });
-  $('#anEmoji').oninput = majEmoji;
-  $('#emoVide').onclick = () => { $('#anEmoji').value = ''; majEmoji(); };
+  $('#anEmoji').addEventListener('input', majEmoji);
+  $('#emoVide').onclick = () => { $('#anEmoji').value = ''; majEmoji(); majApercu(); };
   $('#saveAnnonce').onclick = async () => {
     const titre = $('#anTitre').value.trim();
     if (!titre) { $('#anTitre').classList.add('err'); return toast('Donnez un titre à votre annonce.', 'er'); }
-    const url = $('#anUrl').value.trim();
-    if (url && !/^https?:\/\//i.test(url)) { $('#anUrl').classList.add('err'); return toast('Le lien doit commencer par https://', 'er'); }
+    const f = lireFormulaire();
+    if (!f.lienUrl && f.lienLibelle) {
+      $('#anUrl').classList.add('err');
+      return toast("Ajoutez le lien de destination, sinon le bouton ne s'affichera pas.", 'er');
+    }
+    if (f.lienUrl && !/^https?:\/\/[^\s.]+\.[^\s]{2,}$/i.test(f.lienUrl)) {
+      $('#anUrl').classList.add('err');
+      return toast("Ce lien ne semble pas valide. Exemple : discord.gg/monserveur", 'er');
+    }
     const ok = await API.saveAnnonce({
-      id: a?.id, titre, message: $('#anMsg').value.trim(), type: $('#anType').value,
-      emoji: [...$('#anEmoji').value.trim()].slice(0, 3).join(''),
-      lienUrl: url, lienLibelle: $('#anLibelle').value.trim(),
+      id: a?.id, titre, message: f.message, type: f.type, emoji: f.emoji,
+      lienUrl: f.lienUrl, lienLibelle: f.lienLibelle || (f.lienUrl ? 'En savoir plus' : ''),
       active: $('#anActive').classList.contains('on'),
       debut: $('#anDebut').value || today(), fin: $('#anFin').value || null
     });
@@ -3690,12 +3723,6 @@ const ACTIONS = {
     peindreNotifications();
     await loadAdmin(); render(); toast('Annonce supprimée.');
   },
-  masquerAnnonce: async id => {
-    if (!await API.masquerAnnonce(id)) return;
-    S.annonces = (S.annonces || []).filter(x => x.id !== id);
-    peindreNotifications();
-    closeModal(); render();
-  },
   addAdmin: async () => {
     const mail = $('#admMail').value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) {
@@ -3879,7 +3906,6 @@ $('#btnBell').onclick = () => {
           <div class="t"><b>${esc(x.titre)}</b><span style="white-space:pre-wrap">${esc(x.message)}</span>
             ${x.lienUrl ? `<a href="${esc(x.lienUrl)}" target="_blank" rel="noopener noreferrer"
               style="color:var(--accent-soft);font-size:12px;font-weight:620;display:inline-block;margin-top:6px">${esc(x.lienLibelle || 'En savoir plus')} →</a>` : ''}</div>
-          <button class="btn ico sm gho" data-act="masquerAnnonce:${x.id}"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
         </div>`;
       }).join('')}
       ${a.map(x => `<div class="alert ${x.n}">
