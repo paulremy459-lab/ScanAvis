@@ -980,13 +980,22 @@ const S = {
   allUsers: [],
   ent: null,           // activité (entreprise) actuellement ouverte
   annonces: [],        // messages diffusés par les administrateurs
-  admins: []
+  admins: [],
+  membres: [],         // profils invités par l'utilisateur courant (formateur)
+  invitations: []      // invitations émises, consommées ou en attente
 };
 
 /* ============================================================================
    AUTHENTIFICATION
    ============================================================================ */
 let authMode = 'login';
+
+/* Libellés affichés pour chaque rôle */
+const LIBELLE_ROLE = {
+  super_admin: 'Administrateur',
+  admin: 'Formateur',
+  eleve: 'Utilisateur'
+};
 
 function paintAuth() {
   const isLogin = authMode === 'login';
@@ -1025,6 +1034,13 @@ async function submitAuth() {
 
   try {
     if (authMode === 'signup') {
+      // Contrôle préalable : l'inscription est réservée aux adresses invitées.
+      // La base refuse de toute façon les autres, mais Supabase ne remonte
+      // qu'une erreur technique — autant afficher un message clair ici.
+      const { data: autorise, error: errChk } = await sb.rpc('invitation_valide', { p_email: email });
+      if (!errChk && autorise === false) {
+        return authError("Cette adresse n'a pas été invitée. Demandez une invitation à votre formateur, puis créez votre compte avec l'adresse exacte qu'il aura enregistrée.");
+      }
       const { data, error } = await sb.auth.signUp({
         email, password: pass, options: { data: { nom: name } }
       });
@@ -1053,6 +1069,10 @@ async function submitAuth() {
 
 function traduireErreur(m) {
   const s = String(m).toLowerCase();
+  if (s.includes('invitation_requise')) return "Cette adresse n'a pas été invitée. Demandez une invitation à votre formateur.";
+  if (s.includes('database error saving new user') || s.includes('unexpected_failure')) {
+    return "Cette adresse n'a pas été invitée, ou l'inscription est momentanément indisponible. Vérifiez auprès de votre formateur que votre adresse a bien été enregistrée.";
+  }
   if (s.includes('invalid login')) return 'E-mail ou mot de passe incorrect.';
   if (s.includes('already registered') || s.includes('already been registered')) return 'Un compte existe déjà avec cette adresse.';
   if (s.includes('email not confirmed')) return "Confirmez d'abord votre adresse via l'e-mail reçu.";
@@ -1301,6 +1321,46 @@ const API = {
     return !boum(error);
   },
 
+  /* ---- invitations et membres ---- */
+  /* L'accès est filtré côté base : un formateur ne voit que ses propres
+     invitations et ses propres invités. Le super administrateur voit tout. */
+  async listerInvitations() {
+    const { data, error } = await sb.from('invitations')
+      .select('*').order('created_at', { ascending: false });
+    if (error) { console.warn(error); return []; }
+    return data || [];
+  },
+  async listerMembres() {
+    const { data, error } = await sb.from('profiles')
+      .select('id,email,nom,prenom,nom_famille,role,actif,created_at,invited_by')
+      .order('created_at', { ascending: false });
+    if (error) { console.warn(error); return []; }
+    return data || [];
+  },
+  async inviter(email, role, note) {
+    const { error } = await sb.from('invitations').insert({
+      email, role, note: note || null, invited_by: S.user.id
+    });
+    if (error) {
+      const m = String(error.message || '').toLowerCase();
+      if (m.includes('duplicate') || m.includes('unique')) {
+        toast('Cette adresse a déjà été invitée.', 'er');
+      } else if (m.includes('row-level security')) {
+        toast("Vous n'avez pas le droit d'inviter.", 'er');
+      } else boum(error);
+      return false;
+    }
+    return true;
+  },
+  async revoquerInvitation(id) {
+    const { error } = await sb.from('invitations').delete().eq('id', id);
+    return !boum(error);
+  },
+  async basculerMembre(id, actif) {
+    const { error } = await sb.from('profiles').update({ actif }).eq('id', id);
+    return !boum(error);
+  },
+
   /* ---- annonces ---- */
   /* Les annonces restent affichées tant qu'un administrateur ne les retire pas :
      ni masquage individuel, ni fermeture côté utilisateur. */
@@ -1455,9 +1515,12 @@ async function openSession() {
     nomFamille: prof?.nom_famille || '',
     telephone: prof?.telephone || '',
     createdAt: prof?.created_at || user.created_at,
-    isAdmin: false
+    role: prof?.role || 'eleve',
+    isAdmin: false,
+    isFormateur: false
   };
   S.user.isAdmin = await API.suisJeAdmin();
+  S.user.isFormateur = S.user.isAdmin || S.user.role === 'admin';
 
   try {
     S.db = await API.chargerTout();
@@ -1472,7 +1535,8 @@ async function openSession() {
   $('#app').classList.remove('hidden');
   $('#userChip').textContent = initials(S.user.name);
   $('#userChip').classList.toggle('adm', S.user.isAdmin);
-  $('#brandSub').textContent = S.user.isAdmin ? 'Administrateur' : "Gestion d'activité";
+  $('#brandSub').textContent = S.user.isAdmin ? 'Administrateur'
+    : S.user.role === 'admin' ? 'Formateur' : "Gestion d'activité";
   appliquerTheme(S.db.settings);
   peindreActivite();
   peindreNotifications();
@@ -1619,6 +1683,7 @@ const NAV = [
   ]},
   { g: 'Compte', items: [
     { id: 'params', l: 'Réglages', i: 'i-set' },
+    { id: 'membres', l: 'Mes membres', i: 'i-client', formateurOnly: true },
     { id: 'admin', l: 'Administration', i: 'i-admin', adminOnly: true }
   ]}
 ];
@@ -1643,10 +1708,12 @@ function peindreActivite() {
 function buildNav() {
   const alertN = Calc.alertes().filter(a => a.n === 'r' || a.n === 'o').length;
   $('#rail').innerHTML = NAV.map(sec => {
-    const items = sec.items.filter(it => !it.adminOnly || S.user.isAdmin);
+    const items = sec.items.filter(it =>
+      (!it.adminOnly || S.user.isAdmin) &&
+      (!it.formateurOnly || S.user.isFormateur));
     if (!items.length) return '';
     return `<div class="rail-lbl">${sec.g}</div>` + items.map(it => `
-      <button class="navb ${it.adminOnly ? 'adm' : ''} ${S.view === it.id ? 'on' : ''}" data-go="${it.id}">
+      <button class="navb ${it.adminOnly || it.formateurOnly ? 'adm' : ''} ${S.view === it.id ? 'on' : ''}" data-go="${it.id}">
         <svg viewBox="0 0 24 24"><use href="#${it.i}"/></svg>
         <span>${it.l}</span>
         ${it.id === 'stock' && alertN ? `<span class="pip">${alertN}</span>` : ''}
@@ -1674,7 +1741,8 @@ function render() {
   const R = {
     dash: viewDash, ventes: viewVentes, commandes: viewCommandes, stock: viewStock,
     clients: viewClients, catalogue: viewCatalogue, charges: viewCharges,
-    rapports: viewRapports, params: viewParams, admin: viewAdmin
+    rapports: viewRapports, params: viewParams, admin: viewAdmin,
+    membres: viewMembres
   }[S.view] || viewDash;
   $('#main').innerHTML = `<div class="view">${R()}</div>`;
   wire();
@@ -2515,7 +2583,7 @@ function viewParams() {
           <div><h3>${esc(S.user.name)}</h3><div class="sub">${esc(S.user.email)}</div></div>
         </div>
         <div class="sw-row"><div class="t"><b>Type de compte</b><span>Définit les écrans auxquels vous avez accès</span></div>
-          <span class="pill ${S.user.isAdmin ? 'o' : 'b'}">${S.user.isAdmin ? 'Administrateur' : 'Utilisateur'}</span></div>
+          <span class="pill ${S.user.isAdmin ? 'o' : S.user.role === 'admin' ? 'v' : 'b'}">${LIBELLE_ROLE[S.user.role] || 'Utilisateur'}</span></div>
         <div class="sw-row"><div class="t"><b>Compte créé le</b><span>${new Date(S.user.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div></div>
 
         <div class="divider"></div>
@@ -2868,7 +2936,8 @@ function viewAdmin() {
     ${kpiCard('Comptes créés', num(us.length), 'i-client', '#2E8BFF', `<span>${actifs} avec au moins une vente</span>`)}
     ${kpiCard('CA cumulé', eur(totCA), 'i-euro', '#32D74B', `<span>tous utilisateurs confondus</span>`)}
     ${kpiCard('Ventes enregistrées', num(totVentes), 'i-sale', '#A78BFA', `<span>sur la plateforme</span>`)}
-    ${kpiCard('CA moyen par compte', eur(us.length ? totCA / us.length : 0), 'i-target', '#FFD426', `<span>toutes périodes</span>`)}
+    ${kpiCard('CA moyen par compte', eur(us.length ? totCA / us.length : 0), 'i-target', '#FFD426',
+      `<span>${us.filter(u => u.role === 'admin').length} formateur${us.filter(u => u.role === 'admin').length > 1 ? 's' : ''} sur la plateforme</span>`)}
   </div>
 
   <div class="glass card">
@@ -2878,13 +2947,13 @@ function viewAdmin() {
         <th class="nos num">Clients</th><th class="nos num">Ventes</th><th class="nos num">CA généré</th>
         <th class="nos">État</th><th class="nos"></th></tr></thead>
       <tbody>${us.map(u => {
-        const isAdm = (S.admins || []).some(x => x.email === String(u.email).toLowerCase());
+        const isAdm = u.role === 'super_admin' || u.role === 'admin';
         const me = u.id === S.user.id;
         return `<tr>
           <td><div class="cellflex"><div class="bub" style="background:${isAdm ? 'linear-gradient(150deg,#FFB020,#FF6B35)' : hueFor(u.name)}">${initials(u.name)}</div>
             <div class="t"><b>${esc(u.name)}${me ? ' <span style="color:var(--ink-4);font-weight:500">(vous)</span>' : ''}</b><span>${esc(u.email)}</span></div></div></td>
           <td style="color:var(--ink-3);white-space:nowrap">${dfr(String(u.createdAt).slice(0, 10))}</td>
-          <td><span class="pill ${isAdm ? 'o' : 'b'}">${isAdm ? 'Administrateur' : 'Utilisateur'}</span></td>
+          <td><span class="pill ${u.role === 'super_admin' ? 'o' : u.role === 'admin' ? 'v' : 'b'}">${LIBELLE_ROLE[u.role] || 'Utilisateur'}</span></td>
           <td class="num" style="color:var(--ink-2)">${num(u._stats?.nbC || 0)}</td>
           <td class="num" style="color:var(--ink-2)">${num(u._stats?.nbV || 0)}</td>
           <td class="num str">${eur(u._stats?.ca || 0)}</td>
@@ -2899,22 +2968,24 @@ function viewAdmin() {
 
   <div class="grid g2" style="margin-top:15px">
     <div class="glass card">
-      <div class="card-h"><div><h3>Administrateurs</h3><div class="sub">Ces adresses accèdent à cet écran et publient les annonces</div></div></div>
-      <div class="field" style="margin-bottom:15px">
-        <label for="admMail">Inviter une adresse</label>
-        <div style="display:flex;gap:9px">
-          <input class="inp" id="admMail" type="email" placeholder="collegue@exemple.fr" style="flex:1">
-          <button class="btn pri" data-act="addAdmin">Inviter</button>
-        </div>
-        <span class="hint">La personne devient administratrice dès sa prochaine connexion. Elle doit créer un compte avec cette adresse exacte.</span>
-      </div>
-      ${(S.admins || []).map(a => `
+      <div class="card-h"><div><h3>Rôles et accès</h3><div class="sub">L'inscription est fermée : seules les adresses invitées peuvent créer un compte</div></div>
+        <div class="spacer"></div>
+        <button class="btn sm pri" data-go="membres"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Inviter</button></div>
+      ${(S.invitations || []).filter(i => !i.used_at).length
+        ? `<div class="sw-row" style="border-bottom:1px solid var(--hair)">
+             <div class="t"><b>${num((S.invitations || []).filter(i => !i.used_at).length)} invitation(s) en attente</b>
+               <span>Comptes autorisés mais pas encore créés</span></div>
+             <button class="btn sm" data-go="membres">Gérer</button></div>`
+        : ''}
+      ${(S.allUsers || []).filter(u => u.role === 'admin' || u.role === 'super_admin').map(u => `
         <div class="sw-row">
-          <div class="bub" style="background:${hueFor(a.email)}"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#i-admin"/></svg></div>
-          <div class="t"><b>${esc(a.email)}</b><span>${a.protege ? 'Compte fondateur, non retirable' : 'Ajouté le ' + dfr(String(a.created_at).slice(0, 10))}</span></div>
-          ${a.protege ? '<span class="pill o">Protégé</span>'
-            : `<button class="btn ico sm dgr" data-act="delAdmin:${esc(a.email)}" title="Retirer"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>`}
+          <div class="bub" style="background:${u.role === 'super_admin' ? 'linear-gradient(150deg,#FFB020,#FF6B35)' : hueFor(u.email)}">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#i-admin"/></svg></div>
+          <div class="t"><b>${esc(u.email)}</b>
+            <span>${u.role === 'super_admin' ? 'Compte fondateur, non retirable' : 'Formateur · invite ses propres élèves'}</span></div>
+          <span class="pill ${u.role === 'super_admin' ? 'o' : 'v'}">${LIBELLE_ROLE[u.role]}</span>
         </div>`).join('')}
+      <div class="sw-row"><div class="t"><span style="color:var(--ink-4)">Les formateurs n'ont accès ni à cet écran ni aux données commerciales des autres comptes.</span></div></div>
     </div>
 
     <div class="glass card">
@@ -2943,24 +3014,154 @@ function viewAdmin() {
 
   <div class="glass card" style="margin-top:15px">
     <div class="card-h"><div><h3>Paramètres de la plateforme</h3></div></div>
-    <div class="sw-row"><div class="t"><b>Compte fondateur</b><span>Protégé, il ne peut pas être retiré de la liste des administrateurs</span></div>
+    <div class="sw-row"><div class="t"><b>Compte fondateur</b><span>Protégé : il ne peut être ni rétrogradé ni désactivé, y compris par un autre administrateur</span></div>
       <span class="chip mono">${esc(ADMIN_EMAIL)}</span></div>
+    <div class="sw-row"><div class="t"><b>Inscription</b><span>Sur invitation uniquement, contrôlée côté base de données</span></div>
+      <span class="pill g">Fermée</span></div>
     <div class="sw-row"><div class="t"><b>Base de données</b><span>Postgres hébergé, isolation par Row Level Security</span></div>
       <span class="chip mono">${esc(SUPABASE_URL.replace('https://', ''))}</span></div>
   </div>`;
 }
 
 async function loadAdmin() {
-  const [lignes, admins, annonces] = await Promise.all([
-    API.statsAdmin(), API.listerAdmins(), API.listerToutesAnnonces()
+  const [lignes, annonces, profils, invitations] = await Promise.all([
+    API.statsAdmin(), API.listerToutesAnnonces(), API.listerMembres(), API.listerInvitations()
   ]);
-  S.admins = admins;
   S.allAnnonces = annonces;
+  S.membres = profils;
+  S.invitations = invitations;
+  // Le rôle vient désormais de profiles, plus de la table administrateurs.
+  const roleDe = Object.fromEntries(profils.map(p => [p.id, p.role]));
   S.allUsers = lignes.map(r => ({
     id: r.id, email: r.email, name: r.nom || r.email.split('@')[0],
-    actif: r.actif, createdAt: r.created_at,
+    actif: r.actif, createdAt: r.created_at, role: roleDe[r.id] || 'eleve',
     _stats: { nbV: Number(r.nb_ventes) || 0, nbC: Number(r.nb_clients) || 0, ca: Number(r.ca) || 0 }
   }));
+}
+
+
+/* ============================================================================
+   VUE — MES MEMBRES (formateurs et administrateur)
+
+   Un formateur invite des élèves, suit ses invitations et peut suspendre
+   l'accès de ceux qu'il a lui-même invités. Il ne voit aucune donnée
+   commerciale de ses élèves : ni ventes, ni clients, ni chiffre d'affaires.
+   Cette restriction est appliquée en base, pas seulement à l'écran.
+   ============================================================================ */
+function viewMembres() {
+  if (!S.user.isFormateur) {
+    return emptyState('i-lock', 'Accès réservé',
+      "Cet écran est réservé aux formateurs et à l'administrateur de la plateforme.");
+  }
+
+  const invits = S.invitations || [];
+  const membres = (S.membres || []).filter(m => m.id !== S.user.id);
+  const attente = invits.filter(i => !i.used_at);
+  const utilisees = invits.filter(i => i.used_at);
+  const suspendus = membres.filter(m => m.actif === false).length;
+
+  const nomDe = m =>
+    [m.prenom, m.nom_famille].filter(Boolean).join(' ') || m.nom || m.email.split('@')[0];
+
+  return `
+  <div class="head">
+    <div><h1>Mes membres</h1><p>Invitez des élèves et gérez leur accès à la plateforme.</p></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="reloadMembres"><svg viewBox="0 0 24 24"><use href="#i-chart"/></svg>Actualiser</button>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard('Membres inscrits', num(membres.length), 'i-client', '#2E8BFF',
+      `<span>${suspendus ? suspendus + ' suspendu' + (suspendus > 1 ? 's' : '') : 'tous actifs'}</span>`)}
+    ${kpiCard('Invitations en attente', num(attente.length), 'i-order', '#FFD426',
+      `<span>comptes pas encore créés</span>`)}
+    ${kpiCard('Invitations utilisées', num(utilisees.length), 'i-target', '#32D74B',
+      `<span>sur ${num(invits.length)} envoyée${invits.length > 1 ? 's' : ''}</span>`)}
+    ${kpiCard('Formateurs', num(membres.filter(m => m.role === 'admin').length), 'i-admin', '#A78BFA',
+      `<span>parmi vos invités</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="card-h"><div><h3>Inviter quelqu'un</h3>
+      <div class="sub">Seules les adresses invitées peuvent créer un compte</div></div></div>
+    <div class="grid g2" style="gap:12px">
+      <div class="field">
+        <label for="invMail">Adresse e-mail</label>
+        <input class="inp" id="invMail" type="email" placeholder="eleve@exemple.fr" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="invRole">Rôle attribué</label>
+        <select class="inp" id="invRole">
+          <option value="eleve">Élève — utilise l'outil pour son activité</option>
+          <option value="admin">Formateur — pourra inviter ses propres élèves</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:2px">
+      <label for="invNote">Note interne <span style="color:var(--ink-4);font-weight:400">(facultatif)</span></label>
+      <div style="display:flex;gap:9px">
+        <input class="inp" id="invNote" placeholder="Promo de septembre, session 3…" style="flex:1" autocomplete="off">
+        <button class="btn pri" data-act="inviterMembre">Envoyer l'invitation</button>
+      </div>
+      <span class="hint">La personne devra créer son compte avec cette adresse exacte. Aucun e-mail n'est envoyé automatiquement : prévenez-la de votre côté.</span>
+    </div>
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Invitations en attente</h3>
+      <div class="sub">Adresses autorisées dont le compte n'est pas encore créé</div></div></div>
+    ${attente.length ? attente.map(i => `
+      <div class="sw-row">
+        <div class="bub" style="background:${hueFor(i.email)}">
+          <svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#i-order"/></svg></div>
+        <div class="t"><b>${esc(i.email)}</b>
+          <span>${LIBELLE_ROLE[i.role] || i.role} · invitée le ${dfr(String(i.created_at).slice(0, 10))}${i.note ? ' · ' + esc(i.note) : ''}</span></div>
+        <span class="pill o">En attente</span>
+        <button class="btn ico sm dgr" data-act="revoqInvit:${i.id}" title="Révoquer">
+          <svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+      </div>`).join('')
+      : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Aucune invitation en attente</div>`}
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Membres inscrits</h3>
+      <div class="sub">Suspendre un accès n'efface rien : les données du membre sont conservées</div></div></div>
+    ${membres.length ? `<div class="tbl-scroll"><table>
+      <thead><tr><th class="nos">Membre</th><th class="nos">Rôle</th>
+        <th class="nos">Inscription</th><th class="nos">État</th><th class="nos"></th></tr></thead>
+      <tbody>${membres.map(m => {
+        const sien = m.invited_by === S.user.id;
+        const gerable = S.user.isAdmin || (sien && m.role === 'eleve');
+        return `<tr>
+          <td><div class="cellflex"><div class="bub" style="background:${hueFor(nomDe(m))}">${initials(nomDe(m))}</div>
+            <div class="t"><b>${esc(nomDe(m))}</b><span>${esc(m.email)}</span></div></div></td>
+          <td><span class="pill ${m.role === 'super_admin' ? 'o' : m.role === 'admin' ? 'v' : 'b'}">${LIBELLE_ROLE[m.role] || m.role}</span></td>
+          <td style="color:var(--ink-3);white-space:nowrap">${dfr(String(m.created_at).slice(0, 10))}</td>
+          <td>${m.actif === false ? '<span class="pill r">Suspendu</span>' : '<span class="pill g">Actif</span>'}</td>
+          <td><div class="row-act">${gerable
+            ? `<button class="btn sm ${m.actif === false ? 'suc' : 'dgr'}" data-act="toggleMembre:${m.id}">${m.actif === false ? 'Réactiver' : 'Suspendre'}</button>`
+            : ''}</div></td></tr>`;
+      }).join('')}</tbody></table></div>`
+      : `<div style="padding:34px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Personne n'a encore rejoint via vos invitations</div>`}
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Comment ça marche</h3></div></div>
+    <div class="sw-row"><div class="t"><b>Inscription fermée</b>
+      <span>Une adresse non invitée ne peut pas créer de compte, même en connaissant l'adresse du site</span></div></div>
+    <div class="sw-row"><div class="t"><b>Données cloisonnées</b>
+      <span>Chaque membre ne voit que ses propres ventes, clients et activités. Vous n'y avez pas accès</span></div></div>
+    <div class="sw-row"><div class="t"><b>Suspension réversible</b>
+      <span>Un membre suspendu ne peut plus se connecter, mais rien n'est supprimé</span></div></div>
+  </div>`;
+}
+
+async function loadMembres() {
+  const [invitations, membres] = await Promise.all([
+    API.listerInvitations(), API.listerMembres()
+  ]);
+  S.invitations = invitations;
+  S.membres = membres;
 }
 
 /* ============================================================================
@@ -3723,24 +3924,6 @@ const ACTIONS = {
     peindreNotifications();
     await loadAdmin(); render(); toast('Annonce supprimée.');
   },
-  addAdmin: async () => {
-    const mail = $('#admMail').value.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) {
-      $('#admMail').classList.add('err');
-      return toast("Cette adresse e-mail n'est pas valide.", 'er');
-    }
-    if (!await API.ajouterAdmin(mail)) return;
-    await loadAdmin(); render();
-    toast(`${mail} est désormais administrateur.`);
-  },
-  delAdmin: async email => {
-    if (!await confirmer('Retirer cet administrateur',
-      `${email} perdra l'accès à l'écran Administration. Son compte et ses données restent intacts.`,
-      'Retirer')) return;
-    if (!await API.retirerAdmin(email)) return;
-    await loadAdmin(); render(); toast('Administrateur retiré.');
-  },
-
   newActivite: () => modalActivite(),
   editActivite: id => modalActivite(id),
   switchEnt: async id => {
@@ -3797,6 +3980,46 @@ const ACTIONS = {
     await recharger(); go('dash'); toast('Données effacées.');
   },
   reloadAdmin: async () => { await loadAdmin(); render(); toast('Comptes actualisés.'); },
+  reloadMembres: async () => { await loadMembres(); render(); toast('Membres actualisés.'); },
+
+  inviterMembre: async () => {
+    const mail = $('#invMail').value.trim().toLowerCase();
+    const role = $('#invRole').value;
+    const note = $('#invNote').value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(mail)) {
+      $('#invMail').classList.add('err');
+      return toast("Cette adresse e-mail n'est pas valide.", 'er');
+    }
+    if (role === 'admin' && !await confirmer('Inviter un formateur',
+      `${mail} pourra à son tour inviter ses propres élèves. Il ne verra ni vos données ni celles des autres membres.`,
+      'Inviter comme formateur', false)) return;
+    if (!await API.inviter(mail, role, note)) return;
+    $('#invMail').value = ''; $('#invNote').value = '';
+    await loadMembres(); render();
+    toast(`${mail} peut maintenant créer son compte.`);
+  },
+
+  revoqInvit: async id => {
+    const i = (S.invitations || []).find(x => x.id === id); if (!i) return;
+    if (!await confirmer("Révoquer l'invitation",
+      `${i.email} ne pourra plus créer de compte. Vous pourrez l'inviter à nouveau plus tard.`,
+      'Révoquer')) return;
+    if (!await API.revoquerInvitation(id)) return;
+    await loadMembres(); render(); toast('Invitation révoquée.');
+  },
+
+  toggleMembre: async id => {
+    const m = (S.membres || []).find(x => x.id === id); if (!m) return;
+    const nom = [m.prenom, m.nom_famille].filter(Boolean).join(' ') || m.nom || m.email;
+    const off = m.actif === false;
+    if (!await confirmer(off ? "Réactiver l'accès" : "Suspendre l'accès",
+      off ? `${nom} pourra à nouveau se connecter et retrouvera ses données intactes.`
+          : `${nom} ne pourra plus se connecter ni consulter ses données. Rien n'est supprimé.`,
+      off ? 'Réactiver' : 'Suspendre', !off)) return;
+    if (!await API.basculerMembre(id, off)) return;
+    await loadMembres(); render();
+    toast(off ? 'Accès rétabli.' : 'Accès suspendu.');
+  },
   toggleUser: async id => {
     const u = S.allUsers.find(x => x.id === id); if (!u) return;
     const off = u.actif === false;
@@ -3929,6 +4152,7 @@ const _go = go;
 go = function (view) {
   _go(view);
   if (view === 'admin' && S.user?.isAdmin) loadAdmin().then(render);
+  if (view === 'membres' && S.user?.isFormateur) loadMembres().then(render);
 };
 
 (async function boot() {
