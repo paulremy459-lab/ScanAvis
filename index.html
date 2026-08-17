@@ -981,6 +981,7 @@ const S = {
   ent: null,           // activité (entreprise) actuellement ouverte
   annonces: [],        // messages diffusés par les administrateurs
   admins: [],
+  conso: null,         // données de toutes les activités, pour l'écran Consolidé
   membres: [],         // profils invités par l'utilisateur courant (formateur)
   invitations: []      // invitations émises, consommées ou en attente
 };
@@ -1096,7 +1097,7 @@ const Convertir = {
   vente:    r => ({ id: r.id, clientId: r.client_id, date: r.date, moyen: r.moyen || '', statut: r.statut, remise: toNum(r.remise), notes: r.notes || '', createdAt: r.created_at, lignes: [] }),
   commande: r => ({ id: r.id, fournisseur: r.fournisseur, date: r.date, statut: r.statut, frais: toNum(r.frais), notes: r.notes || '', dateReception: r.date_reception, createdAt: r.created_at, lignes: [] }),
   charge:   r => ({ id: r.id, libelle: r.libelle, categorie: r.categorie || 'Autre', montant: toNum(r.montant), date: r.date }),
-  annonce: r => ({ id: r.id, titre: r.titre, message: r.message || '', type: r.type || 'info', emoji: r.emoji || '',
+  annonce: r => ({ id: r.id, auteur: r.auteur, titre: r.titre, message: r.message || '', type: r.type || 'info', emoji: r.emoji || '',
     lienUrl: r.lien_url || '', lienLibelle: r.lien_libelle || '', active: r.active,
     debut: r.debut, fin: r.fin, createdAt: r.created_at }),
   entreprise: r => ({ id: r.id, nom: r.nom, secteur: r.secteur || '', objectif: toNum(r.objectif),
@@ -1321,6 +1322,56 @@ const API = {
     return !boum(error);
   },
 
+  /* ---- consolidation multi-activités ---- */
+  /* Charge les données de TOUTES les activités du compte, sans filtre
+     entreprise_id, puis les regroupe par activité. La RLS limite déjà la
+     requête aux lignes de l'utilisateur : rien d'autre ne peut remonter. */
+  async chargerConsolide() {
+    const u = S.user.id;
+    const [prod, ven, vli, cmd, cli2, chg] = await Promise.all([
+      sb.from('produits').select('*').eq('user_id', u),
+      sb.from('ventes').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('vente_lignes').select('*').eq('user_id', u),
+      sb.from('commandes').select('*').eq('user_id', u).order('date', { ascending: false }),
+      sb.from('commande_lignes').select('*').eq('user_id', u),
+      sb.from('charges').select('*').eq('user_id', u).order('date', { ascending: false })
+    ]);
+    const err = [prod, ven, vli, cmd, cli2, chg].find(r => r.error);
+    if (err) { boum(err.error); return null; }
+
+    // Convertir() ne retient pas entreprise_id : on le rattache pour pouvoir
+    // répartir chaque ligne dans la bonne activité.
+    const avecEnt = (rows, f) => (rows || []).map(r => ({ ...f(r), entrepriseId: r.entreprise_id }));
+
+    const ventes = avecEnt(ven.data, Convertir.vente);
+    const iv = Object.fromEntries(ventes.map(v => [v.id, v]));
+    for (const l of vli.data || []) {
+      iv[l.vente_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, prix: toNum(l.prix) });
+    }
+    const commandes = avecEnt(cmd.data, Convertir.commande);
+    const ic = Object.fromEntries(commandes.map(c => [c.id, c]));
+    for (const l of cli2.data || []) {
+      ic[l.commande_id]?.lignes.push({ produitId: l.produit_id, qte: l.qte, cout: toNum(l.cout) });
+    }
+    const produits = avecEnt(prod.data, Convertir.produit);
+    const charges  = avecEnt(chg.data, Convertir.charge);
+
+    // On reconstitue un jeu de données par activité, de la même forme que
+    // celui utilisé par le reste de l'app : les calculs restent identiques.
+    const parEnt = {};
+    for (const e of S.db.entreprises || []) {
+      parEnt[e.id] = { entreprises: [e], clients: [], produits: [], ventes: [], commandes: [], charges: [] };
+    }
+    const ranger = (liste, cle) => {
+      for (const x of liste) if (parEnt[x.entrepriseId]) parEnt[x.entrepriseId][cle].push(x);
+    };
+    ranger(produits, 'produits');
+    ranger(ventes, 'ventes');
+    ranger(commandes, 'commandes');
+    ranger(charges, 'charges');
+    return parEnt;
+  },
+
   /* ---- invitations et membres ---- */
   /* L'accès est filtré côté base : un formateur ne voit que ses propres
      invitations et ses propres invités. Le super administrateur voit tout. */
@@ -1481,10 +1532,12 @@ function appliquerTheme(st) {
 /* Recharge la base depuis Supabase puis rafraîchit l'écran courant. */
 async function recharger(silencieux) {
   try {
+    S.conso = null;   // les totaux seront recalculés au prochain affichage
     S.db = await API.chargerTout();
     appliquerTheme(S.db.settings);
     peindreActivite();
     peindreNotifications();
+    if (S.view === 'conso') await loadConso();
     if (!silencieux) { buildNav(); render(); }
   } catch (e) {
     console.error(e);
@@ -1669,6 +1722,7 @@ const Calc = {
 const NAV = [
   { g: 'Pilotage', items: [
     { id: 'dash', l: 'Tableau de bord', i: 'i-dash' },
+    { id: 'conso', l: 'Consolidé', i: 'i-target' },
     { id: 'rapports', l: 'Rapports', i: 'i-chart' }
   ]},
   { g: 'Activité', items: [
@@ -1742,7 +1796,7 @@ function render() {
     dash: viewDash, ventes: viewVentes, commandes: viewCommandes, stock: viewStock,
     clients: viewClients, catalogue: viewCatalogue, charges: viewCharges,
     rapports: viewRapports, params: viewParams, admin: viewAdmin,
-    membres: viewMembres
+    membres: viewMembres, conso: viewConso
   }[S.view] || viewDash;
   $('#main').innerHTML = `<div class="view">${R()}</div>`;
   wire();
@@ -2890,7 +2944,7 @@ function modalAnnonce(id) {
     closeModal();
     S.annonces = await API.listerAnnonces();
     peindreNotifications();
-    await loadAdmin(); render();
+    await rechargerEcranGestion(); render();
     toast(a ? 'Annonce mise à jour.' : 'Annonce publiée.');
   };
 }
@@ -2989,7 +3043,7 @@ function viewAdmin() {
     </div>
 
     <div class="glass card">
-      <div class="card-h"><div><h3>Annonces</h3><div class="sub">Diffusées à tous les utilisateurs de la plateforme</div></div>
+      <div class="card-h"><div><h3>Annonces</h3><div class="sub">Les vôtres touchent toute la plateforme ; celles d'un formateur, ses seuls élèves</div></div>
         <div class="spacer"></div>
         <button class="btn sm pri" data-act="newAnnonce"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Publier</button></div>
       ${(S.allAnnonces || []).length ? (S.allAnnonces || []).map(a => {
@@ -3040,6 +3094,214 @@ async function loadAdmin() {
 }
 
 
+
+/* ============================================================================
+   VUE — CONSOLIDÉ (toutes activités cumulées)
+
+   Le reste de l'application travaille sur une seule activité à la fois.
+   Cet écran additionne les résultats de toutes. Pour garantir des chiffres
+   identiques à ceux de chaque activité prise séparément, on ne recalcule
+   rien ici : on réutilise les fonctions de Calc en leur présentant
+   successivement le jeu de données de chaque activité.
+   ============================================================================ */
+
+/* Exécute fn() comme si `db` était l'activité ouverte, puis rétablit l'état.
+   Synchrone de bout en bout : aucun risque d'entrelacement. */
+function surActivite(db, fn) {
+  const sauvegarde = S.db;
+  S.db = db;
+  try { return fn(); } finally { S.db = sauvegarde; }
+}
+
+function viewConso() {
+  const parEnt = S.conso;
+  const ents = S.db?.entreprises || [];
+
+  if (!parEnt) {
+    return `<div class="head"><div><h1>Consolidé</h1><p>Toutes vos activités réunies.</p></div></div>
+      <div class="glass card"><div style="padding:40px 0;text-align:center;color:var(--ink-4);font-size:12.5px">
+        Calcul des résultats…</div></div>`;
+  }
+  if (ents.length < 2) {
+    return `<div class="head"><div><h1>Consolidé</h1><p>Toutes vos activités réunies.</p></div></div>
+      ${emptyState('i-chart', 'Une seule activité',
+        "Cet écran cumule les résultats de plusieurs activités. Créez-en une seconde depuis les Réglages pour comparer leurs performances.")}`;
+  }
+
+  const [d1, d2] = Calc.bornes(S.period);
+  const periodLbl = { mois: 'ce mois-ci', trim: 'ce trimestre', annee: 'cette année', tout: 'depuis le début' }[S.period];
+
+  // Un bloc de résultats par activité, calculé avec les formules d'origine.
+  const lignes = ents.map(e => {
+    const db = parEnt[e.id];
+    if (!db) return { e, ca: 0, marge: 0, charges: 0, nbV: 0, stock: 0, impayes: 0, serie: [] };
+    const r = surActivite(db, () => ({
+      ca: Calc.caEntre(d1, d2),
+      marge: Calc.margeEntre(d1, d2),
+      charges: Calc.chargesEntre(d1, d2),
+      nbV: Calc.ventesEntre(d1, d2).length,
+      stock: Calc.valeurStock(),
+      impayes: Calc.impayes(),
+      serie: Calc.serie12()
+    }));
+    return { e, ...r, resultat: r.marge - r.charges };
+  }).sort((a, b) => b.ca - a.ca);
+
+  const T = lignes.reduce((t, l) => ({
+    ca: t.ca + l.ca, marge: t.marge + l.marge, charges: t.charges + l.charges,
+    nbV: t.nbV + l.nbV, stock: t.stock + l.stock, impayes: t.impayes + l.impayes
+  }), { ca: 0, marge: 0, charges: 0, nbV: 0, stock: 0, impayes: 0 });
+  T.resultat = T.marge - T.charges;
+
+  // Série mensuelle cumulée : on additionne mois par mois toutes les activités.
+  const mois = (lignes[0]?.serie || []).map((m, i) => ({
+    label: m.label, annee: m.annee,
+    ca: lignes.reduce((s, l) => s + (l.serie[i]?.ca || 0), 0),
+    marge: lignes.reduce((s, l) => s + (l.serie[i]?.marge || 0), 0),
+    nb: lignes.reduce((s, l) => s + (l.serie[i]?.nb || 0), 0),
+    parEnt: lignes.map(l => ({ nom: l.e.nom, couleur: l.e.couleur, ca: l.serie[i]?.ca || 0 }))
+  }));
+
+  const txMarge = T.ca ? (T.marge / T.ca) * 100 : 0;
+  const objectifTotal = ents.reduce((s, e) => s + (Number(e.objectif) || 0), 0);
+  const caMois = lignes.reduce((s, l) => s + surActivite(parEnt[l.e.id] || { produits: [], ventes: [], commandes: [], charges: [] },
+    () => Calc.caEntre(...Calc.bornes('mois'))), 0);
+
+  return `
+  <div class="head">
+    <div><h1>Consolidé</h1><p>Vos ${ents.length} activités réunies, ${periodLbl}.</p></div>
+    <div class="spacer"></div>
+    <div class="seg" id="periodSeg">
+      ${[['mois', 'Mois'], ['trim', 'Trimestre'], ['annee', 'Année'], ['tout', 'Tout']]
+        .map(([k, l]) => `<button data-p="${k}" class="${S.period === k ? 'on' : ''}">${l}</button>`).join('')}
+    </div>
+    <button class="btn" data-act="reloadConso"><svg viewBox="0 0 24 24"><use href="#i-chart"/></svg>Actualiser</button>
+  </div>
+
+  <div class="grid g4" style="margin-bottom:15px">
+    ${kpiCard("Chiffre d'affaires", eur(T.ca), 'i-euro', '#2E8BFF',
+      `<span>${num(T.nbV)} vente${T.nbV > 1 ? 's' : ''} sur l'ensemble</span>`)}
+    ${kpiCard('Marge brute', eur(T.marge), 'i-chart', '#32D74B',
+      `<span>${T.ca ? pct(txMarge) + ' du chiffre d\'affaires' : 'aucune vente'}</span>`)}
+    ${kpiCard('Charges', eur(T.charges), 'i-charge', '#FF9F0A',
+      `<span>toutes activités confondues</span>`)}
+    ${kpiCard('Résultat net', eur(T.resultat), 'i-target', T.resultat >= 0 ? '#32D74B' : '#FF453A',
+      `<span>${T.resultat >= 0 ? 'marge moins charges' : 'les charges dépassent la marge'}</span>`)}
+  </div>
+
+  <div class="glass card">
+    <div class="card-h"><div><h3>Résultat par activité</h3>
+      <div class="sub">Classées par chiffre d'affaires ${periodLbl}</div></div></div>
+    <div class="tbl-scroll"><table>
+      <thead><tr><th class="nos">Activité</th><th class="nos num">Ventes</th>
+        <th class="nos num">Chiffre d'affaires</th><th class="nos num">Part</th>
+        <th class="nos num">Marge</th><th class="nos num">Charges</th>
+        <th class="nos num">Résultat</th><th class="nos"></th></tr></thead>
+      <tbody>${lignes.map(l => {
+        const part = T.ca ? (l.ca / T.ca) * 100 : 0;
+        return `<tr>
+          <td><div class="cellflex">
+            <div class="bub" style="background:${l.e.couleur || '#2E8BFF'}">${initials(l.e.nom)}</div>
+            <div class="t"><b>${esc(l.e.nom)}${l.e.id === S.ent ? ' <span class="pill b np" style="font-size:10px;padding:1px 7px">ouverte</span>' : ''}</b>
+              <span>${esc(l.e.secteur || 'Sans secteur')}${l.impayes ? ' · ' + eur(l.impayes) + ' en attente' : ''}</span></div></div></td>
+          <td class="num" style="color:var(--ink-2)">${num(l.nbV)}</td>
+          <td class="num str">${eur(l.ca)}</td>
+          <td class="num"><div style="display:flex;align-items:center;gap:7px;justify-content:flex-end">
+            <div style="width:46px;height:5px;border-radius:3px;background:var(--hair);overflow:hidden">
+              <div style="width:${Math.min(100, part)}%;height:100%;background:${l.e.couleur || '#2E8BFF'}"></div></div>
+            <span style="color:var(--ink-3);font-size:11.5px;min-width:38px">${pct(part)}</span></div></td>
+          <td class="num" style="color:#6EE787;font-weight:620">${eur(l.marge)}</td>
+          <td class="num" style="color:var(--ink-3)">${eur(l.charges)}</td>
+          <td class="num" style="font-weight:680;color:${l.resultat >= 0 ? '#6EE787' : '#FF8078'}">${eur(l.resultat)}</td>
+          <td><div class="row-act">${l.e.id !== S.ent
+            ? `<button class="btn sm" data-act="switchEnt:${l.e.id}">Ouvrir</button>` : ''}</div></td>
+        </tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr style="border-top:1px solid var(--hair)">
+        <td style="font-weight:680">Total</td>
+        <td class="num" style="font-weight:620">${num(T.nbV)}</td>
+        <td class="num str" style="font-weight:680">${eur(T.ca)}</td>
+        <td class="num" style="color:var(--ink-4)">100 %</td>
+        <td class="num" style="color:#6EE787;font-weight:680">${eur(T.marge)}</td>
+        <td class="num" style="color:var(--ink-3);font-weight:620">${eur(T.charges)}</td>
+        <td class="num" style="font-weight:700;color:${T.resultat >= 0 ? '#6EE787' : '#FF8078'}">${eur(T.resultat)}</td>
+        <td></td></tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Évolution sur 12 mois</h3>
+      <div class="sub">Chiffre d'affaires cumulé, réparti par activité</div></div></div>
+    ${chartConso(mois, lignes)}
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hair)">
+      ${lignes.map(l => `<div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3)">
+        <span style="width:9px;height:9px;border-radius:3px;background:${l.e.couleur || '#2E8BFF'};display:inline-block"></span>
+        ${esc(l.e.nom)}</div>`).join('')}
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:15px">
+    <div class="glass card">
+      <div class="card-h"><div><h3>Synthèse</h3></div></div>
+      <div class="trow"><span>Valeur du stock, toutes activités</span><b>${eur(T.stock)}</b></div>
+      <div class="trow"><span>Encaissements en attente</span><b style="color:${T.impayes ? '#FFDF6B' : 'inherit'}">${eur(T.impayes)}</b></div>
+      <div class="trow"><span>Taux de marge brute moyen</span><b>${T.ca ? pct(txMarge) : '—'}</b></div>
+      <div class="trow"><span>Panier moyen</span><b>${T.nbV ? eur(T.ca / T.nbV) : '—'}</b></div>
+      <div class="trow"><span>Activité la plus rentable</span><b>${lignes.length ? esc([...lignes].sort((a, b) => b.resultat - a.resultat)[0].e.nom) : '—'}</b></div>
+    </div>
+    <div class="glass card">
+      <div class="card-h"><div><h3>Objectif mensuel cumulé</h3>
+        <div class="sub">Somme des objectifs fixés sur chaque activité</div></div></div>
+      ${objectifTotal > 0
+        ? `<div style="display:flex;align-items:center;gap:18px;padding:6px 0">
+             ${chartRing(caMois / objectifTotal, pct((caMois / objectifTotal) * 100).replace(' %', '%'), eur0(caMois))}
+             <div class="t" style="flex:1">
+               <b style="font-size:14px">${eur(caMois)} sur ${eur(objectifTotal)}</b>
+               <span>${caMois >= objectifTotal
+                 ? 'Objectif cumulé atteint ce mois-ci.'
+                 : `Reste ${eur(objectifTotal - caMois)} à réaliser d'ici la fin du mois.`}</span></div></div>`
+        : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">
+             Aucun objectif défini. Fixez-en un par activité depuis les Réglages.</div>`}
+    </div>
+  </div>`;
+}
+
+/* Histogramme empilé : une couleur par activité, mois par mois. */
+function chartConso(mois, lignes) {
+  if (!mois.length) return `<div style="padding:30px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Pas encore de données</div>`;
+  const W = 760, H = 210, PT = 14, PB = 26, PL = 8;
+  const ih = H - PT - PB;
+  const top = Math.max(...mois.map(m => m.ca), 1);
+  const gw = (W - PL * 2) / mois.length;
+  const bw = Math.min(gw * 0.62, 34);
+
+  let barres = '', libelles = '';
+  mois.forEach((m, i) => {
+    const x = PL + i * gw + (gw - bw) / 2;
+    let y = PT + ih;
+    for (const seg of m.parEnt) {
+      if (seg.ca <= 0) continue;
+      const h = (seg.ca / top) * ih;
+      y -= h;
+      barres += `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h, 1)}" rx="3"
+        fill="${seg.couleur || '#2E8BFF'}" opacity=".88"><title>${esc(m.label)} ${m.annee} — ${esc(seg.nom)} : ${eur(seg.ca)}</title></rect>`;
+    }
+    if (m.ca <= 0) {
+      barres += `<rect x="${x}" y="${PT + ih - 2}" width="${bw}" height="2" rx="1" fill="var(--hair)"/>`;
+    }
+    libelles += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle"
+      style="font-size:10px;fill:var(--ink-4)">${esc(m.label)}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible" preserveAspectRatio="xMidYMid meet">
+    <line x1="${PL}" y1="${PT + ih}" x2="${W - PL}" y2="${PT + ih}" stroke="var(--hair)" stroke-width="1"/>
+    ${barres}${libelles}</svg>`;
+}
+
+async function loadConso() {
+  S.conso = await API.chargerConsolide();
+}
+
 /* ============================================================================
    VUE — MES MEMBRES (formateurs et administrateur)
 
@@ -3062,6 +3324,12 @@ function viewMembres() {
 
   const nomDe = m =>
     [m.prenom, m.nom_famille].filter(Boolean).join(' ') || m.nom || m.email.split('@')[0];
+
+  // On distingue ce que le formateur a publié de ce qui vient de la plateforme :
+  // il ne peut modifier que les siennes.
+  const toutes = S.allAnnonces || [];
+  const mesAnnonces = toutes.filter(a => a.auteur === S.user.id);
+  const autresAnnonces = toutes.filter(a => a.auteur !== S.user.id);
 
   return `
   <div class="head">
@@ -3146,6 +3414,32 @@ function viewMembres() {
   </div>
 
   <div class="glass card" style="margin-top:15px">
+    <div class="card-h"><div><h3>Annonces</h3>
+      <div class="sub">Diffusées à vos élèves uniquement, en bandeau sur leur tableau de bord</div></div>
+      <div class="spacer"></div>
+      <button class="btn sm pri" data-act="newAnnonce"><svg viewBox="0 0 24 24"><use href="#i-plus"/></svg>Publier</button></div>
+    ${mesAnnonces.length ? mesAnnonces.map(a => {
+      const t = TYPES_ANNONCE[a.type] || TYPES_ANNONCE.info;
+      const finie = a.fin && a.fin < today();
+      return `<div class="sw-row" style="align-items:flex-start">
+        ${a.emoji
+          ? `<div class="emo-bulle sm" style="background:linear-gradient(150deg,${t.col}3a,${t.col}18)">${esc(a.emoji)}</div>`
+          : `<div class="kpi-ico" style="width:30px;height:30px;background:linear-gradient(150deg,${t.col}3a,${t.col}18);color:${t.col}">
+               <svg viewBox="0 0 24 24" style="width:14px;height:14px"><use href="#${t.ico}"/></svg></div>`}
+        <div class="t"><b>${esc(a.titre)}</b>
+          <span>${esc((a.message || '').slice(0, 90))}${(a.message || '').length > 90 ? '…' : ''}</span>
+          <span style="margin-top:4px">${a.active && !finie ? '<span class="pill g">En ligne</span>' : '<span class="pill n">Hors ligne</span>'}
+            ${a.fin ? ' · jusqu\'au ' + dfr(a.fin) : ''}</span></div>
+        <button class="btn ico sm" data-act="editAnnonce:${a.id}"><svg viewBox="0 0 24 24"><use href="#i-edit"/></svg></button>
+        <button class="btn ico sm dgr" data-act="delAnnonce:${a.id}"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>
+      </div>`;
+    }).join('')
+      : `<div style="padding:26px 0;text-align:center;color:var(--ink-4);font-size:12.5px">Aucune annonce publiée</div>`}
+    ${autresAnnonces.length ? `<div class="sw-row" style="border-top:1px solid var(--hair);margin-top:6px;padding-top:12px">
+      <div class="t"><span style="color:var(--ink-4)">${num(autresAnnonces.length)} annonce${autresAnnonces.length > 1 ? 's' : ''} de la plateforme ${autresAnnonces.length > 1 ? 'sont diffusées' : 'est diffusée'} en plus des vôtres.</span></div></div>` : ''}
+  </div>
+
+  <div class="glass card" style="margin-top:15px">
     <div class="card-h"><div><h3>Comment ça marche</h3></div></div>
     <div class="sw-row"><div class="t"><b>Inscription fermée</b>
       <span>Une adresse non invitée ne peut pas créer de compte, même en connaissant l'adresse du site</span></div></div>
@@ -3153,15 +3447,27 @@ function viewMembres() {
       <span>Chaque membre ne voit que ses propres ventes, clients et activités. Vous n'y avez pas accès</span></div></div>
     <div class="sw-row"><div class="t"><b>Suspension réversible</b>
       <span>Un membre suspendu ne peut plus se connecter, mais rien n'est supprimé</span></div></div>
+    <div class="sw-row"><div class="t"><b>Annonces ciblées</b>
+      <span>Vos annonces ne s'affichent que chez vos propres élèves, jamais chez ceux d'un autre formateur</span></div></div>
   </div>`;
 }
 
+/* Recharge l'écran d'où l'action a été lancée. loadAdmin() appelle des RPC
+   réservées au super administrateur : un formateur doit passer par loadMembres. */
+async function rechargerEcranGestion() {
+  if (S.view === 'admin' && S.user.isAdmin) return loadAdmin();
+  if (S.user.isFormateur) return loadMembres();
+}
+
 async function loadMembres() {
-  const [invitations, membres] = await Promise.all([
-    API.listerInvitations(), API.listerMembres()
+  const [invitations, membres, annonces] = await Promise.all([
+    API.listerInvitations(), API.listerMembres(), API.listerToutesAnnonces()
   ]);
   S.invitations = invitations;
   S.membres = membres;
+  // La base ne renvoie que les annonces que l'utilisateur a le droit de voir :
+  // un formateur ne récupère donc que les siennes et celles de la plateforme.
+  S.allAnnonces = annonces;
 }
 
 /* ============================================================================
@@ -3918,17 +4224,18 @@ const ACTIONS = {
   editAnnonce: id => modalAnnonce(id),
   delAnnonce: async id => {
     const a = (S.allAnnonces || []).find(x => x.id === id); if (!a) return;
-    if (!await confirmer('Supprimer l\'annonce', `« ${a.titre} » disparaîtra de l'écran de tous les utilisateurs.`)) return;
+    if (!await confirmer('Supprimer l\'annonce',
+      `« ${a.titre} » disparaîtra de l'écran ${S.user.isAdmin ? 'de tous les utilisateurs' : 'de vos élèves'}.`)) return;
     if (!await API.supprimerAnnonce(id)) return;
     S.annonces = await API.listerAnnonces();
     peindreNotifications();
-    await loadAdmin(); render(); toast('Annonce supprimée.');
+    await rechargerEcranGestion(); render(); toast('Annonce supprimée.');
   },
   newActivite: () => modalActivite(),
   editActivite: id => modalActivite(id),
   switchEnt: async id => {
     if (id === S.ent) return closeModal();
-    S.ent = id; closeModal();
+    S.ent = id; S.conso = null; closeModal();
     S.filters = {}; S.search = ''; $('#globalSearch').value = '';
     await recharger(); go('dash');
     const e = S.db.entreprises.find(x => x.id === id);
@@ -3981,6 +4288,7 @@ const ACTIONS = {
   },
   reloadAdmin: async () => { await loadAdmin(); render(); toast('Comptes actualisés.'); },
   reloadMembres: async () => { await loadMembres(); render(); toast('Membres actualisés.'); },
+  reloadConso: async () => { await loadConso(); render(); toast('Résultats recalculés.'); },
 
   inviterMembre: async () => {
     const mail = $('#invMail').value.trim().toLowerCase();
@@ -4153,6 +4461,7 @@ go = function (view) {
   _go(view);
   if (view === 'admin' && S.user?.isAdmin) loadAdmin().then(render);
   if (view === 'membres' && S.user?.isFormateur) loadMembres().then(render);
+  if (view === 'conso') loadConso().then(render);
 };
 
 (async function boot() {
