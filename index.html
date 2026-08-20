@@ -842,6 +842,11 @@ html.clair .trend.fl{background:rgba(10,22,38,.06);color:var(--ink-3)}
    Remplace les deux constantes ci-dessous par les tiennes :
    Supabase > Project Settings > API (URL du projet + clé « anon public »).
    =========================================================================== */
+/* Marqueur de version : affiché dans Réglages et écrit dans la console au
+   démarrage. Il permet de savoir d'un coup d'œil si le navigateur sert bien
+   le dernier fichier poussé, au lieu d'un cache. */
+const VERSION = 'v4 — 20 août 2026 · trésorerie + estimation + peau ScanAvis';
+
 const SUPABASE_URL = 'https://cbtjjfelcqnkemfpzpsz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNidGpqZmVsY3Fua2VtZnB6cHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDQ3NTAsImV4cCI6MjEwMjcyMDc1MH0.XGyTVaNT6a2M_WwGaQYw0cRxe1vbMKL1mGaqgJRFWXs';
 
@@ -2201,6 +2206,9 @@ function viewReglages() {
           <div style="font-size:12px;color:var(--ink-3)">Contrôlé en base : ni la clé publique ni l'API REST ne permettent d'entrer autrement.</div></div>
       </div>
       <button class="btn dgr" data-act="deconnexion"><svg viewBox="0 0 24 24"><use href="#i-out"/></svg>Se déconnecter</button>
+      <div class="divider" style="margin:18px 0"></div>
+      <div style="font-size:12px;color:var(--ink-3)">Version installée
+        <span class="mono" id="versionApp" style="color:var(--ink-2)">${esc(VERSION)}</span></div>
     </div>
   </div>`;
 }
@@ -2685,6 +2693,7 @@ $('#globalSearch').addEventListener('input', e => {
 });
 
 (async function init() {
+  console.log('%cRevente ' + VERSION, 'font-weight:700');
   const { data } = await db.auth.getSession();
   $('#boot').classList.add('hidden');
   if (data.session) demarrer();
